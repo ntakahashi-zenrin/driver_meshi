@@ -1,0 +1,1637 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<!-- ===== ZENRIN Maps API（検証環境）OAuth2.0認証（head 内） ===== -->
+<script type="text/javascript">
+  // ▼▼▼ サーバー側（curl/Postman等）で取得したアクセストークンをここに貼ってください（検証環境・有効1〜2時間） ▼▼▼
+  var DORAMESHI_ACCESS_TOKEN = 'eyJraWQiOiJwN29McFZpTlo1NENSNWpQV0FQWStONVdnS1lxOUt0R0ZKSHhnR1pBL0ZvPSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiI1cm5tdG5vYmNwcGxpbWI4dWNxdHRhaXVzaSIsInRva2VuX3VzZSI6ImFjY2VzcyIsInNjb3BlIjoiYXBwL2RlZmF1bHQiLCJhdXRoX3RpbWUiOjE3ODI0NDEwNjksImlzcyI6Imh0dHBzOi8vY29nbml0by1pZHAuYXAtbm9ydGhlYXN0LTEuYW1hem9uYXdzLmNvbS9hcC1ub3J0aGVhc3QtMV9MaDAySmQ2NXkiLCJleHAiOjE3ODI0NDgyNjksImlhdCI6MTc4MjQ0MTA2OSwidmVyc2lvbiI6MiwianRpIjoiOWQ3Yzc4ZGQtMWZiNC00ODA0LTllYjAtMDgxZmNlMzhlZmY3IiwiY2xpZW50X2lkIjoiNXJubXRub2JjcHBsaW1iOHVjcXR0YWl1c2kifQ.l0j4N4dJIGxw-cUg9LGhjUyXoRY52jRKq7IQPQW1gzCcO_eN1KLTcGxKEs53c3-8PMNyraeR-a_saA3yEx6-iSRuy2hFpBI0iBAAMALjaKS76nmIt19aUi_ikeKcY55Gho71duyAGfCucdLWBWJ3Qf6aUWuOb4PHQ77MUsTRUhjmY_6NNWugND5s2HirfDnklwp4A-mRaQSbjpm3G2EcoUVlPdzCUQ0s379xWj2ZH-ixc2yjxgnf3HxqYomWcFaqvw5kigVktGeXHc9MY-1DjmEXZkilXWRrVU14B8iIKgu_BmgWoWtrDHgkK-QWakum4n3hR6EjU3v7fkp7iQaDcQ';
+  // ▲▲▲ 例: 'eyABC...（長い文字列）' ▲▲▲
+  var DORAMESHI_API_KEY = 'hAuveDSFg4aCxgBAfMG6k8IPlFlpM4Ao8T73YhH2';
+  var DORAMESHI_TOKEN_TYPE = 'Bearer';
+  var DORAMESHI_MAPS_LOADER = 'https://test-web.zmaps-api.com/maps_loader'; // 検証環境WebAPIドメイン
+  // 中心点の緯度経度（海老名SA付近）
+  var DORAMESHI_LAT = 35.4344, DORAMESHI_LNG = 139.3899;
+  var dorameshiMap, dorameshiMarker;
+
+  function dorameshiSetCoords(lat, lng) {
+    var a = document.getElementById('map-lat'), b = document.getElementById('map-lng');
+    if (a) a.textContent = (+lat).toFixed(4);
+    if (b) b.textContent = (+lng).toFixed(4);
+  }
+  function dorameshiFallback(note) {
+    var el = document.getElementById('dorameshi-zmap');
+    if (!el || el.querySelector('.zmap-fallback')) return;
+    el.innerHTML =
+      '<div class="zmap-fallback" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;background:repeating-linear-gradient(45deg,#eef1f4,#eef1f4 12px,#e7ebef 12px,#e7ebef 24px);">' +
+        '<div style="width:46px;height:46px;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;margin-bottom:12px;font-size:22px;">🗺️</div>' +
+        '<p style="font-size:13px;font-weight:700;color:#374151;margin:0 0 4px;">ZENRIN Maps API（検証環境）</p>' +
+        '<p style="font-size:11px;color:#6b7280;line-height:1.6;margin:0;max-width:250px;">' + note + '</p>' +
+      '</div>';
+    dorameshiSetCoords(DORAMESHI_LAT, DORAMESHI_LNG);
+  }
+
+  // 地図生成本体（OAuth：ZisAuth.getMapOption → ZDC.Map）
+  function dorameshiDrawMap() {
+    var el = document.getElementById('dorameshi-zmap');
+    if (!el) { setTimeout(dorameshiDrawMap, 150); return; } // 地図divを待つ
+    if (el._zmapBuilt) return;
+    el._zmapBuilt = true;
+
+    var mapOptions = window.ZisAuth.getMapOption();
+    mapOptions.center = new ZDC.LatLng(DORAMESHI_LAT, DORAMESHI_LNG); // 中心点の緯度経度を設定
+
+    dorameshiMap = new ZDC.Map(
+      el,
+      mapOptions,
+      function () {
+        // Success callback
+        dorameshiMap.addControl(new ZDC.ZoomButton('top-right')); // 拡大縮小ボタン
+        // マーカーを作成・追加（中心点）
+        try {
+          dorameshiMarker = new ZDC.Marker(new ZDC.LatLng(DORAMESHI_LAT, DORAMESHI_LNG), { styleId: ZDC.MARKER_COLOR_ID_RED_L });
+          dorameshiMap.addWidget(dorameshiMarker);
+        } catch (e) { console.warn('marker skip', e); }
+        // 地図移動に合わせて中心座標とマーカーを更新（位置の微調整）
+        var update = function () {
+          var c = dorameshiMap.getCenter();
+          if (!c) return;
+          dorameshiSetCoords(c.lat, c.lng);
+          try {
+            if (dorameshiMarker) dorameshiMap.removeWidget(dorameshiMarker);
+            dorameshiMarker = new ZDC.Marker(new ZDC.LatLng(c.lat, c.lng), { styleId: ZDC.MARKER_COLOR_ID_RED_L });
+            dorameshiMap.addWidget(dorameshiMarker);
+          } catch (e) {}
+        };
+        dorameshiMap.addEventListener('moveend', update);
+        dorameshiSetCoords(DORAMESHI_LAT, DORAMESHI_LNG);
+      },
+      function () {
+        // Failure callback
+        dorameshiFallback('地図の生成に失敗しました。マップタイプの契約をご確認ください。');
+      }
+    );
+  }
+
+  // maps_loader をトークン付きで取得 → 評価 → ZisAuth ready で地図生成
+  function dorameshiLoadOAuth() {
+    fetch(DORAMESHI_MAPS_LOADER, {
+      headers: { 'x-api-key': DORAMESHI_API_KEY, 'authorization': DORAMESHI_TOKEN_TYPE + ' ' + DORAMESHI_ACCESS_TOKEN }
+    })
+      .then(function (res) { if (!res.ok) throw new Error('maps_loader ' + res.status); return res.text(); })
+      .then(function (js) {
+        var sc = document.createElement('script');
+        sc.type = 'text/javascript';
+        sc.text = js;
+        document.head.appendChild(sc);
+        (function waitAuth(n) {
+          if (window.ZisAuth) {
+            window.ZisAuth.addEventListener('ready', function () { dorameshiDrawMap(); });
+            window.ZisAuth.addEventListener('failed', function (e) { console.error('ZisAuth failed', e); dorameshiFallback('認証に失敗しました（ZisAuth failed）。'); });
+          } else if (n < 60) {
+            setTimeout(function () { waitAuth(n + 1); }, 150);
+          } else {
+            dorameshiFallback('ZisAuth の初期化に失敗しました。');
+          }
+        })(0);
+      })
+      .catch(function (err) {
+        console.error('maps_loader error', err);
+        dorameshiFallback('トークン認証エラー（' + err.message + '）。アクセストークンの有効期限・再取得をご確認ください。');
+      });
+  }
+
+  (function start(n) {
+    var el = document.getElementById('dorameshi-zmap');
+    if (DORAMESHI_ACCESS_TOKEN === '__ZENRIN_ACCESS_TOKEN__') {
+      if (!el) { if (n < 60) setTimeout(function () { start(n + 1); }, 150); return; }
+      dorameshiFallback('OAuth2.0のアクセストークンを設定すると、ここにゼンリンの実地図が表示されます。トークンをチャットに貼ってください。');
+      return;
+    }
+    dorameshiLoadOAuth();
+  })(0);
+</script>
+<style>
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;}
+  .scr::-webkit-scrollbar{width:0;height:0;}
+  .scr{scrollbar-width:none;-ms-overflow-style:none;}
+  .no-scrollbar::-webkit-scrollbar{display:none;}
+  .no-scrollbar{-ms-overflow-style:none;scrollbar-width:none;}
+</style>
+</helmet>
+<div style="min-width:100%;min-height:100vh;width:max-content;box-sizing:border-box;padding:48px;background:#e7e5df;display:flex;flex-direction:column;gap:56px;">
+
+  <div style="max-width:1100px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+      <div style="width:34px;height:34px;border-radius:9px;background:#ff6b35;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;">🚛</div>
+      <h1 style="margin:0;font-size:24px;font-weight:700;color:#1f2937;">トラックドライバー飯 ／ 画面一覧（全13画面）</h1>
+    </div>
+    <p style="margin:0 0 18px;font-size:14px;color:#6b7280;line-height:1.7;">Figma Make出力（React + Tailwind）を画面単位で整理したボードです。各フレーム左上の <code style="background:#fff;padding:1px 6px;border-radius:4px;border:1px solid #e5e7eb;">画面ID</code> は <code style="background:#fff;padding:1px 6px;border-radius:4px;border:1px solid #e5e7eb;">App.tsx</code> の Screen 名／コンポーネント名に対応します。Claude Code へ渡す際はこのIDを基準にしてください。</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px 14px;font-size:12px;color:#4b5563;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;line-height:1.6;">
+      <span style="font-weight:600;color:#111827;">主な遷移：</span>
+      <span><code>login</code> → <code>mypage</code></span><span style="color:#d1d5db;">｜</span>
+      <span><code>feed</code> → <code>post-detail</code> / <code>gallery-detail</code> / <code>driver-profile</code> / <code>notifications</code></span><span style="color:#d1d5db;">｜</span>
+      <span>下部ナビ＋ボタン → <code>post</code>（→ <code>location-picker</code>） / <code>gallery-post</code></span><span style="color:#d1d5db;">｜</span>
+      <span><code>mypage</code> → <code>settings</code> → <code>following-list</code> / <code>profile-edit</code></span>
+    </div>
+  </div>
+
+  <!-- ============ SECTION A ============ -->
+  <div>
+    <h2 style="margin:0 0 18px;font-size:15px;font-weight:700;color:#374151;letter-spacing:.02em;">① 入口・タイムライン</h2>
+    <div style="display:flex;gap:48px;align-items:flex-start;">
+
+      <!-- LOGIN -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">ログイン</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">login · LoginScreen</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div class="flex flex-col h-full bg-white overflow-y-auto scr">
+            <header class="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
+              <div class="flex items-center gap-3">
+                <button><i data-lucide="arrow-left" class="w-6 h-6 text-gray-700"></i></button>
+                <h1 class="text-lg font-medium text-gray-900">ログイン</h1>
+              </div>
+            </header>
+            <div class="flex-1 px-5 py-6">
+              <h2 class="text-xl font-bold text-gray-900 mb-1">ログイン</h2>
+              <p class="text-sm text-[#ff6b35] mb-6">メールとパスワードでログインしてください。</p>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
+                  <input type="email" placeholder="you@example.com" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">パスワード（8文字以上）</label>
+                  <input type="password" placeholder="••••••••" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <button class="w-full py-3 bg-[#ff6b35] text-white rounded-xl font-medium mt-2">ログイン</button>
+              </div>
+              <p class="text-center text-sm text-gray-600 mt-6">アカウントがない方は <span class="text-[#ff6b35] font-medium">新規登録</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REGISTER -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;">
+          <span style="font-size:13px;font-weight:600;color:#111827;">新規登録</span>
+          <span style="font-size:11px;color:#9ca3af;font-family:monospace;">login(register) · LoginScreen</span>
+        </div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div class="flex flex-col h-full bg-white overflow-y-auto scr">
+            <header class="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
+              <div class="flex items-center gap-3">
+                <button><i data-lucide="arrow-left" class="w-6 h-6 text-gray-700"></i></button>
+                <h1 class="text-lg font-medium text-gray-900">ログイン</h1>
+              </div>
+            </header>
+            <div class="flex-1 px-5 py-6">
+              <h2 class="text-xl font-bold text-gray-900 mb-1">新規登録</h2>
+              <p class="text-sm text-gray-500 mb-6">ドライバーとして登録します。入力は最小限、あとは選ぶだけ。</p>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
+                  <input type="email" defaultValue="n_takahashi@zenrin-datacom.net" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#ff6b35]" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">パスワード（8文字以上）</label>
+                  <input type="password" defaultValue="Svnstars0083@" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#ff6b35]" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">ニックネーム</label>
+                  <input type="text" placeholder="例：関西便のタカ" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#ff6b35]" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">車種・ボディタイプ</label>
+                  <select class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#ff6b35] bg-white">
+                    <option>大型ウイング</option>
+                    <option>トレーラー</option>
+                    <option>4t冷凍車</option>
+                    <option>中型平ボディ</option>
+                    <option>軽貨物</option>
+                    <option>その他</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">運行スタイル</label>
+                  <select class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#ff6b35] bg-white">
+                    <option>長距離</option>
+                    <option>地場配送</option>
+                    <option>中距離</option>
+                    <option>ルート配送</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">主な走行エリア</label>
+                  <select class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#ff6b35] bg-white">
+                    <option>関東〜関西</option>
+                    <option>関東地場</option>
+                    <option>東北</option>
+                    <option>中部</option>
+                    <option>関西</option>
+                    <option>九州</option>
+                    <option>港・湾岸エリア</option>
+                    <option>全国</option>
+                  </select>
+                </div>
+                <button class="w-full py-3 bg-[#ff6b35] text-white rounded-xl font-medium mt-2">登録する</button>
+              </div>
+              <p class="text-center text-sm text-gray-600 mt-6 pb-8">
+                すでにアカウントをお持ちの方は <span class="text-[#ff6b35] font-medium">ログイン</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FORGOT PASSWORD -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;">
+          <span style="font-size:13px;font-weight:600;color:#111827;">パスワードをお忘れの方</span>
+          <span style="font-size:11px;color:#9ca3af;font-family:monospace;">forgot-password · ForgotPasswordScreen</span>
+        </div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div class="flex flex-col h-full bg-white overflow-y-auto scr">
+            <header class="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
+              <div class="flex items-center gap-3">
+                <button><i data-lucide="arrow-left" class="w-6 h-6 text-gray-700"></i></button>
+                <h1 class="text-lg font-medium text-gray-900">ログイン</h1>
+              </div>
+            </header>
+            <div class="flex-1 px-5 py-8">
+              <!-- アイコン -->
+              <div class="flex justify-center mb-6">
+                <div class="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center">
+                  <i data-lucide="lock" class="w-9 h-9 text-[#ff6b35]"></i>
+                </div>
+              </div>
+              <h2 class="text-xl font-bold text-gray-900 mb-2 text-center">パスワードをお忘れですか？</h2>
+              <p class="text-sm text-gray-500 mb-8 text-center leading-relaxed">
+                登録したメールアドレスを入力してください。<br />パスワード再設定のリンクをお送りします。
+              </p>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
+                  <input type="email" placeholder="you@example.com" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#ff6b35]" />
+                </div>
+                <button class="w-full py-3 bg-[#ff6b35] text-white rounded-xl font-medium mt-2">
+                  再設定メールを送る
+                </button>
+              </div>
+              <p class="text-center text-sm text-gray-600 mt-6">
+                <span class="text-[#ff6b35] font-medium">ログインに戻る</span>
+              </p>
+
+              <!-- 送信完了状態（参考） -->
+              <div class="mt-10 pt-8 border-t border-gray-100">
+                <p class="text-xs text-gray-400 text-center mb-4 font-medium">── 送信完了後の状態 ──</p>
+                <div class="bg-green-50 border border-green-200 rounded-xl p-5 text-center">
+                  <div class="flex justify-center mb-3">
+                    <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                      <i data-lucide="mail-check" class="w-6 h-6 text-green-600"></i>
+                    </div>
+                  </div>
+                  <p class="text-sm font-medium text-gray-900 mb-1">メールを送信しました</p>
+                  <p class="text-xs text-gray-500 leading-relaxed">
+                    you@example.com に<br />再設定リンクをお送りしました。<br />メールをご確認ください。
+                  </p>
+                  <button class="mt-4 text-sm text-[#ff6b35] font-medium">ログインに戻る</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FEED -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">飯タイムライン（おすすめ）</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">feed · FeedTimeline</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;">
+            <div class="flex flex-col h-full bg-gray-50">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
+                <div class="flex items-center justify-between">
+                  <h1 class="text-xl text-[#ff6b35]">トラックドライバー飯</h1>
+                  <button class="p-2 relative">
+                    <i data-lucide="bell" class="w-5 h-5 text-gray-700"></i>
+                    <span class="absolute top-1 right-1 w-2 h-2 bg-[#ff6b35] rounded-full"></span>
+                  </button>
+                </div>
+                <div class="flex gap-4 mt-3 overflow-x-auto no-scrollbar">
+                  <button class="text-sm pb-2 border-b-2 whitespace-nowrap border-[#ff6b35] text-[#ff6b35]">おすすめ</button>
+                  <button class="text-sm pb-2 border-b-2 whitespace-nowrap border-transparent text-gray-600">フォロー中</button>
+                  <button class="text-sm pb-2 border-b-2 whitespace-nowrap border-transparent text-gray-600">SA・PA</button>
+                  <button class="text-sm pb-2 border-b-2 whitespace-nowrap border-transparent text-gray-600">デカ盛り</button>
+                  <button class="text-sm pb-2 border-b-2 whitespace-nowrap border-transparent text-gray-600">大型車OK</button>
+                </div>
+              </header>
+              <div class="flex-1 overflow-y-auto pb-4 scr">
+                <article class="bg-white border-b border-gray-200 mb-2">
+                  <div class="flex items-center justify-between px-4 py-3">
+                    <button class="flex items-center gap-3">
+                      <img src="https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=150&h=150&fit=crop" class="w-10 h-10 rounded-full object-cover" />
+                      <div class="text-left">
+                        <p class="text-sm">関西便のタカ</p>
+                        <p class="text-xs text-gray-600">大型ウイング | 関東〜関西</p>
+                      </div>
+                    </button>
+                    <button class="px-4 py-1 bg-[#ff6b35] text-white text-sm rounded-full">フォロー</button>
+                  </div>
+                  <div class="relative w-full aspect-[4/3]">
+                    <img src="https://images.unsplash.com/photo-1602273660127-a0000560a4c1?w=800&h=600&fit=crop" class="w-full h-full object-cover" />
+                    <button class="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/75 rounded-full shadow-md flex items-center justify-center"><i data-lucide="chevron-right" class="w-5 h-5 text-gray-700"></i></button>
+                    <div class="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
+                      <span class="w-1.5 h-1.5 rounded-full bg-white"></span><span class="w-1.5 h-1.5 rounded-full bg-white/40"></span><span class="w-1.5 h-1.5 rounded-full bg-white/40"></span>
+                    </div>
+                    <div class="absolute top-2 right-2 bg-black/40 text-white text-xs px-2 py-0.5 rounded-full">1 / 3</div>
+                  </div>
+                  <div class="px-4 py-3">
+                    <h3 class="text-base mb-1">デカ盛り唐揚げ定食</h3>
+                    <p class="text-sm text-gray-600">海老名SA 下り</p>
+                    <div class="flex items-center gap-3 mt-2 text-sm text-gray-600">
+                      <span>1,280円</span>
+                      <span class="flex items-center gap-1"><i data-lucide="map-pin" class="w-4 h-4"></i>神奈川県海老名市</span>
+                    </div>
+                    <div class="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 text-xs rounded-full mt-2 mb-2"><i data-lucide="truck" class="w-3 h-3"></i>大型車OK</div>
+                    <div class="flex flex-wrap gap-2 mb-3">
+                      <span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">長距離</span>
+                      <span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">デカ盛り</span>
+                      <span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">深夜飯</span>
+                    </div>
+                    <div class="flex items-center gap-4 pt-2">
+                      <button class="flex items-center gap-2 text-gray-600"><i data-lucide="heart" class="w-5 h-5"></i><span class="text-sm">124</span></button>
+                      <button class="flex items-center gap-2 text-gray-600"><i data-lucide="message-circle" class="w-5 h-5"></i><span class="text-sm">18</span></button>
+                    </div>
+                  </div>
+                </article>
+                <article class="bg-white border-b border-gray-200 mb-2">
+                  <div class="flex items-center justify-between px-4 py-3">
+                    <button class="flex items-center gap-3">
+                      <img src="https://images.unsplash.com/photo-1630572780070-fce8b9e1e7e7?w=150&h=150&fit=crop" class="w-10 h-10 rounded-full object-cover" />
+                      <div class="text-left">
+                        <p class="text-sm">地場めしユウ</p>
+                        <p class="text-xs text-gray-600">4t冷凍車 | 関東地場</p>
+                      </div>
+                    </button>
+                    <button class="px-4 py-1 bg-[#ff6b35] text-white text-sm rounded-full">フォロー</button>
+                  </div>
+                  <div class="w-full aspect-[4/3]"><img src="https://images.unsplash.com/photo-1547559101-69ffc8762cb2?w=800&h=600&fit=crop" class="w-full h-full object-cover" /></div>
+                  <div class="px-4 py-3">
+                    <h3 class="text-base mb-1">朝定食セット</h3>
+                    <p class="text-sm text-gray-600">食堂まつり</p>
+                    <div class="flex items-center gap-3 mt-2 text-sm text-gray-600"><span>780円</span><span class="flex items-center gap-1"><i data-lucide="map-pin" class="w-4 h-4"></i>埼玉県川口市</span></div>
+                    <div class="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 text-xs rounded-full mt-2 mb-2"><i data-lucide="truck" class="w-3 h-3"></i>大型車OK</div>
+                    <div class="flex flex-wrap gap-2 mb-3"><span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">朝定食</span><span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">地元飯</span><span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">駐車場広め</span></div>
+                    <div class="flex items-center gap-4 pt-2"><button class="flex items-center gap-2 text-gray-600"><i data-lucide="heart" class="w-5 h-5"></i><span class="text-sm">89</span></button><button class="flex items-center gap-2 text-gray-600"><i data-lucide="message-circle" class="w-5 h-5"></i><span class="text-sm">12</span></button></div>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-[#ff6b35]"><i data-lucide="home" class="w-5 h-5"></i></span><span class="text-[10px] text-[#ff6b35]">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="search" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- POST-DETAIL -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">投稿詳細</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">post-detail · PostDetailScreen</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-white">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10 flex items-center justify-between">
+                <button><i data-lucide="arrow-left" class="w-6 h-6 text-gray-700"></i></button>
+                <span></span>
+                <button class="w-9 h-9 -mr-2 flex items-center justify-center rounded-full"><i data-lucide="more-vertical" class="w-5 h-5 text-gray-600"></i></button>
+              </header>
+              <div class="flex-1 overflow-y-auto pb-4 scr">
+                <div class="relative w-full aspect-[4/3] bg-gray-100">
+                  <img src="https://images.unsplash.com/photo-1602273660127-a0000560a4c1?w=800&h=600&fit=crop" class="w-full h-full object-cover" />
+                  <button class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/30 rounded-full flex items-center justify-center"><i data-lucide="chevron-right" class="w-5 h-5 text-white"></i></button>
+                  <div class="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-white"></span><span class="w-1.5 h-1.5 rounded-full bg-white/40"></span><span class="w-1.5 h-1.5 rounded-full bg-white/40"></span></div>
+                </div>
+                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <button class="flex items-center gap-3">
+                    <img src="https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=150&h=150&fit=crop" class="w-10 h-10 rounded-full object-cover" />
+                    <div class="text-left"><p class="text-sm font-medium">関西便のタカ</p><p class="text-xs text-gray-500">大型ウイング ｜ 関東〜関西</p></div>
+                  </button>
+                  <button class="px-4 py-1.5 bg-[#ff6b35] text-white text-sm rounded-full">フォロー</button>
+                </div>
+                <div class="px-4 py-4 border-b border-gray-100">
+                  <h2 class="text-lg font-bold text-gray-900 mb-1">デカ盛り唐揚げ定食</h2>
+                  <p class="text-sm text-gray-600 mb-3">海老名SA 下り</p>
+                  <div class="flex items-center gap-4 text-sm text-gray-600 mb-3"><span class="font-medium text-gray-900">1,280円</span><span class="flex items-center gap-1"><i data-lucide="map-pin" class="w-4 h-4"></i>神奈川県海老名市</span></div>
+                  <div class="inline-flex items-center gap-1 px-3 py-1 bg-green-50 text-green-700 text-xs rounded-full mb-3"><i data-lucide="truck" class="w-3 h-3"></i>大型車OK</div>
+                  <p class="text-sm text-gray-700 leading-relaxed mb-3">深夜2時の休憩で寄りました。唐揚げがジューシーでごはんが進む！駐車場も広くて大型余裕です。</p>
+                  <div class="flex flex-wrap gap-2"><span class="px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">長距離</span><span class="px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">デカ盛り</span><span class="px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">深夜飯</span><span class="px-3 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">SA・PA</span></div>
+                </div>
+                <div class="flex items-center px-4 py-3 border-b border-gray-100">
+                  <div class="flex items-center gap-5">
+                    <button class="flex items-center gap-2"><i data-lucide="heart" class="w-6 h-6 text-gray-500"></i><span class="text-sm font-medium text-gray-600">124</span></button>
+                    <button class="flex items-center gap-2 text-gray-500"><i data-lucide="message-circle" class="w-6 h-6"></i><span class="text-sm font-medium text-gray-600">5</span></button>
+                  </div>
+                  <button class="ml-auto flex items-center justify-center w-9 h-9 rounded-full"><i data-lucide="share-2" class="w-5 h-5 text-gray-500"></i></button>
+                </div>
+                <div class="px-4 py-4">
+                  <h3 class="text-sm font-medium text-gray-900 mb-4">コメント <span class="text-gray-400 font-normal">5件</span></h3>
+                  <div class="space-y-4">
+                    <div class="flex gap-3">
+                      <img src="https://images.unsplash.com/photo-1630572780070-fce8b9e1e7e7?w=150&h=150&fit=crop" class="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5" />
+                      <div class="flex-1 min-w-0"><div class="bg-gray-50 rounded-2xl rounded-tl-sm px-3 py-2"><p class="text-xs font-medium text-gray-900 mb-0.5">地場めしユウ</p><p class="text-sm text-gray-700 leading-relaxed">ここ最高ですよね！自分も先週行きました</p></div><div class="flex items-center gap-3 mt-1 px-1"><span class="text-xs text-gray-400">23時間前</span><button class="text-xs text-[#ff6b35]">返信</button></div></div>
+                    </div>
+                    <div class="flex gap-3">
+                      <img src="https://images.unsplash.com/photo-1624395213043-fa2e123b2656?w=150&h=150&fit=crop" class="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5" />
+                      <div class="flex-1 min-w-0"><div class="bg-gray-50 rounded-2xl rounded-tl-sm px-3 py-2"><p class="text-xs font-medium text-gray-900 mb-0.5">夜景トレーラー</p><p class="text-sm text-gray-700 leading-relaxed">大型の駐車スペースが広いのが助かる</p></div><div class="flex items-center gap-3 mt-1 px-1"><span class="text-xs text-gray-400">20時間前</span><button class="text-xs text-[#ff6b35]">返信</button></div></div>
+                    </div>
+                  </div>
+                  <button class="mt-4 text-sm text-[#ff6b35] font-medium">コメントをすべて見る（5件）</button>
+                </div>
+              </div>
+              <div class="border-t border-gray-200 bg-white px-4 py-3 flex items-center gap-3">
+                <img src="https://images.unsplash.com/photo-1630572780070-fce8b9e1e7e7?w=150&h=150&fit=crop" class="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                <div class="flex-1 flex items-center bg-gray-100 rounded-full px-4 py-2 gap-2"><input type="text" placeholder="コメントを入力..." class="flex-1 bg-transparent text-sm outline-none" /></div>
+              </div>
+            </div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="home" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="search" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- GALLERY DETAIL -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">ギャラリー投稿詳細</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">gallery-detail · GalleryDetailScreen</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-white">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10 flex items-center justify-between">
+                <button><i data-lucide="arrow-left" class="w-6 h-6 text-gray-700"></i></button>
+                <span class="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs rounded flex items-center gap-1"><i data-lucide="image" class="w-3 h-3"></i>ギャラリー</span>
+                <button class="w-9 h-9 -mr-2 flex items-center justify-center rounded-full"><i data-lucide="more-vertical" class="w-5 h-5 text-gray-600"></i></button>
+              </header>
+              <div class="flex-1 overflow-y-auto pb-20 scr">
+                <!-- メイン写真 -->
+                <div class="relative w-full bg-gray-100" style="aspect-ratio:16/9;">
+                  <img src="https://images.unsplash.com/photo-1604604994333-f1b0e9471186?w=800&h=450&fit=crop" class="w-full h-full object-cover" />
+                  <div class="absolute bottom-3 right-3 bg-black/40 text-white text-xs px-2 py-0.5 rounded-full">1 / 2</div>
+                </div>
+                <!-- 投稿者 -->
+                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <button class="flex items-center gap-3">
+                    <img src="https://images.unsplash.com/photo-1624395213043-fa2e123b2656?w=150&h=150&fit=crop" class="w-10 h-10 rounded-full object-cover" />
+                    <div class="text-left"><p class="text-sm font-medium">夜景トレーラー</p><p class="text-xs text-gray-500">トレーラー ｜ 港・湾岸エリア</p></div>
+                  </button>
+                  <button class="px-4 py-1.5 bg-[#ff6b35] text-white text-sm rounded-full">フォロー</button>
+                </div>
+                <!-- キャプション -->
+                <div class="px-4 py-4 border-b border-gray-100">
+                  <p class="text-base text-gray-800 leading-relaxed">深夜2時の湾岸線。今日も安全運転で行きます。<br />こういう景色があるから夜間走行も悪くない。</p>
+                  <p class="text-xs text-gray-400 mt-3">2時間前</p>
+                </div>
+                <!-- アクション -->
+                <div class="flex items-center gap-5 px-4 py-3 border-b border-gray-100">
+                  <button class="flex items-center gap-2">
+                    <i data-lucide="heart" class="w-6 h-6 fill-[#ff6b35] text-[#ff6b35]"></i>
+                    <span class="text-sm font-medium text-[#ff6b35]">90</span>
+                  </button>
+                  <button class="flex items-center gap-2 text-gray-500">
+                    <i data-lucide="message-circle" class="w-6 h-6"></i>
+                    <span class="text-sm font-medium text-gray-600">12</span>
+                  </button>
+                  <button class="flex items-center justify-center w-9 h-9 rounded-full text-gray-500 ml-auto">
+                    <i data-lucide="share-2" class="w-5 h-5"></i>
+                  </button>
+                </div>
+                <!-- コメント -->
+                <div class="px-4 py-4">
+                  <h3 class="text-sm font-medium text-gray-900 mb-4">コメント <span class="text-gray-400 font-normal">12件</span></h3>
+                  <div class="space-y-4">
+                    <div class="flex gap-3">
+                      <img src="https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=150&h=150&fit=crop" class="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5" />
+                      <div class="flex-1"><div class="bg-gray-50 rounded-2xl rounded-tl-sm px-3 py-2"><p class="text-xs font-medium text-gray-900 mb-0.5">関西便のタカ</p><p class="text-sm text-gray-700">湾岸の夜景、最高ですね！自分もよく走ります</p></div><div class="flex items-center gap-3 mt-1 px-1"><span class="text-xs text-gray-400">1時間前</span><button class="text-xs text-[#ff6b35]">返信</button></div></div>
+                    </div>
+                    <div class="flex gap-3">
+                      <img src="https://images.unsplash.com/photo-1630572780070-fce8b9e1e7e7?w=150&h=150&fit=crop" class="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5" />
+                      <div class="flex-1"><div class="bg-gray-50 rounded-2xl rounded-tl-sm px-3 py-2"><p class="text-xs font-medium text-gray-900 mb-0.5">地場めしユウ</p><p class="text-sm text-gray-700">安全運転で！お疲れ様です🙏</p></div><div class="flex items-center gap-3 mt-1 px-1"><span class="text-xs text-gray-400">45分前</span><button class="text-xs text-[#ff6b35]">返信</button></div></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- コメント入力 -->
+              <div class="border-t border-gray-200 bg-white px-4 py-3 flex items-center gap-3">
+                <img src="https://images.unsplash.com/photo-1630572780070-fce8b9e1e7e7?w=150&h=150&fit=crop" class="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                <div class="flex-1 flex items-center bg-gray-100 rounded-full px-4 py-2"><input type="text" placeholder="コメントを入力..." class="flex-1 bg-transparent text-sm outline-none" /></div>
+              </div>
+            </div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="home" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="search" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+
+      <!-- POST-DETAIL: ⋮メニュー展開 -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">投稿詳細（⋮メニュー）</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">post-detail · own post</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;position:relative;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-white">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                <button><i data-lucide="arrow-left" class="w-6 h-6 text-gray-700"></i></button>
+                <span></span>
+                <button class="w-9 h-9 -mr-2 flex items-center justify-center rounded-full bg-gray-100"><i data-lucide="more-vertical" class="w-5 h-5 text-gray-800"></i></button>
+              </header>
+              <div class="flex-1 overflow-y-auto pb-4 scr">
+                <div class="relative w-full aspect-[4/3] bg-gray-100">
+                  <img src="https://images.unsplash.com/photo-1602273660127-a0000560a4c1?w=800&h=600&fit=crop" class="w-full h-full object-cover" />
+                  <button class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/30 rounded-full flex items-center justify-center"><i data-lucide="chevron-right" class="w-5 h-5 text-white"></i></button>
+                  <div class="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-white"></span><span class="w-1.5 h-1.5 rounded-full bg-white/40"></span><span class="w-1.5 h-1.5 rounded-full bg-white/40"></span></div>
+                </div>
+                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <div class="flex items-center gap-3">
+                    <img src="https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=150&h=150&fit=crop" class="w-10 h-10 rounded-full object-cover" />
+                    <div class="text-left"><p class="text-sm font-medium">関西便のタカ</p><p class="text-xs text-gray-500">大型ウイング ｜ 関東〜関西</p></div>
+                  </div>
+                  <span class="px-3 py-1 bg-orange-50 text-[#ff6b35] text-xs rounded-full font-medium">自分の投稿</span>
+                </div>
+                <div class="px-4 py-4 border-b border-gray-100">
+                  <h2 class="text-lg font-bold text-gray-900 mb-1">デカ盛り唐揚げ定食</h2>
+                  <p class="text-sm text-gray-600 mb-3">海老名SA 下り</p>
+                  <div class="flex items-center gap-4 text-sm text-gray-600 mb-3"><span class="font-medium text-gray-900">1,280円</span><span class="flex items-center gap-1"><i data-lucide="map-pin" class="w-4 h-4"></i>神奈川県海老名市</span></div>
+                  <p class="text-sm text-gray-700 leading-relaxed">深夜2時の休憩で寄りました。唐揚げがジューシーでごはんが進む！</p>
+                </div>
+                <div class="flex items-center px-4 py-3 border-b border-gray-100">
+                  <div class="flex items-center gap-5">
+                    <button class="flex items-center gap-2"><i data-lucide="heart" class="w-6 h-6 text-gray-500"></i><span class="text-sm font-medium text-gray-600">124</span></button>
+                    <button class="flex items-center gap-2 text-gray-500"><i data-lucide="message-circle" class="w-6 h-6"></i><span class="text-sm font-medium text-gray-600">5</span></button>
+                  </div>
+                  <button class="ml-auto flex items-center justify-center w-9 h-9 rounded-full"><i data-lucide="share-2" class="w-5 h-5 text-gray-500"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- ドロップダウンメニュー -->
+          <div style="position:absolute;inset:0;background:rgba(17,24,39,.25);z-index:20;"></div>
+          <div style="position:absolute;top:52px;right:10px;z-index:21;background:#fff;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.18);overflow:hidden;min-width:180px;border:1px solid #f0f0f0;">
+            <button class="w-full flex items-center gap-3 px-4 py-3.5 text-left"><i data-lucide="trash-2" class="w-[18px] h-[18px] text-red-500 flex-shrink-0"></i><span class="text-sm text-red-600 font-medium">削除する</span></button>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1" style="position:relative;z-index:1;">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="home" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="search" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- POST-DETAIL: 削除確認ダイアログ -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">投稿詳細（削除確認）</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">post-detail · delete confirm</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;position:relative;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-white">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                <button><i data-lucide="arrow-left" class="w-6 h-6 text-gray-700"></i></button>
+                <span></span>
+                <button class="w-9 h-9 -mr-2 flex items-center justify-center rounded-full"><i data-lucide="more-vertical" class="w-5 h-5 text-gray-600"></i></button>
+              </header>
+              <div class="flex-1 overflow-y-auto pb-4 scr opacity-40">
+                <div class="relative w-full aspect-[4/3] bg-gray-100">
+                  <img src="https://images.unsplash.com/photo-1602273660127-a0000560a4c1?w=800&h=600&fit=crop" class="w-full h-full object-cover" />
+                </div>
+                <div class="px-4 py-4">
+                  <h2 class="text-lg font-bold text-gray-900 mb-1">デカ盛り唐揚げ定食</h2>
+                  <p class="text-sm text-gray-600">海老名SA 下り</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- ダイアログオーバーレイ -->
+          <div style="position:absolute;inset:0;background:rgba(17,24,39,.5);z-index:20;display:flex;align-items:center;justify-content:center;padding:0 32px;">
+            <div style="width:100%;background:#fff;border-radius:18px;overflow:hidden;text-align:center;">
+              <div style="padding:28px 24px 20px;">
+                <div style="width:52px;height:52px;border-radius:50%;background:#fef2f2;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;"><i data-lucide="trash-2" class="w-6 h-6 text-red-500"></i></div>
+                <p style="margin:0 0 8px;font-size:16px;font-weight:700;color:#111827;">この投稿を削除しますか？</p>
+                <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.75;">削除すると元に戻せません。<br>いいね・コメントもすべて削除されます。</p>
+              </div>
+              <div style="display:flex;border-top:1px solid #f3f4f6;">
+                <button style="flex:1;padding:16px;font-size:15px;color:#374151;background:none;border:none;border-right:1px solid #f3f4f6;cursor:pointer;">キャンセル</button>
+                <button style="flex:1;padding:16px;font-size:15px;font-weight:700;color:#dc2626;background:none;border:none;cursor:pointer;">削除する</button>
+              </div>
+            </div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1" style="position:relative;z-index:1;opacity:.4;">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="home" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="search" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- POST-DETAIL: 共有シート -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">投稿詳細（共有）</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">post-detail · share sheet</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;position:relative;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-white">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                <button><i data-lucide="arrow-left" class="w-6 h-6 text-gray-700"></i></button>
+                <span></span>
+                <button class="w-9 h-9 -mr-2 flex items-center justify-center rounded-full"><i data-lucide="more-vertical" class="w-5 h-5 text-gray-600"></i></button>
+              </header>
+              <div class="flex-1 overflow-y-auto pb-4 scr">
+                <div class="relative w-full aspect-[4/3] bg-gray-100">
+                  <img src="https://images.unsplash.com/photo-1602273660127-a0000560a4c1?w=800&h=600&fit=crop" class="w-full h-full object-cover" />
+                </div>
+                <div class="px-4 py-4 border-b border-gray-100">
+                  <h2 class="text-lg font-bold text-gray-900 mb-1">デカ盛り唐揚げ定食</h2>
+                  <p class="text-sm text-gray-600">海老名SA 下り</p>
+                </div>
+                <div class="flex items-center px-4 py-3 border-b border-gray-100">
+                  <div class="flex items-center gap-5">
+                    <button class="flex items-center gap-2"><i data-lucide="heart" class="w-6 h-6 text-gray-500"></i><span class="text-sm font-medium text-gray-600">124</span></button>
+                    <button class="flex items-center gap-2 text-gray-500"><i data-lucide="message-circle" class="w-6 h-6"></i><span class="text-sm font-medium text-gray-600">5</span></button>
+                  </div>
+                  <button class="ml-auto flex items-center justify-center w-9 h-9 rounded-full bg-gray-100"><i data-lucide="share-2" class="w-5 h-5 text-gray-700"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- 暗幕 -->
+          <div style="position:absolute;inset:0;background:rgba(17,24,39,.4);z-index:20;"></div>
+          <!-- 共有ボトムシート -->
+          <div style="position:absolute;left:0;right:0;bottom:0;z-index:21;background:#fff;border-radius:20px 20px 0 0;padding:0 0 8px;box-shadow:0 -6px 32px rgba(0,0,0,.15);">
+            <div style="width:38px;height:4px;border-radius:99px;background:#e5e7eb;margin:12px auto 4px;"></div>
+            <!-- プレビュー -->
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #f3f4f6;margin-bottom:4px;">
+              <img src="https://images.unsplash.com/photo-1602273660127-a0000560a4c1?w=150&h=150&fit=crop" style="width:48px;height:48px;border-radius:10px;object-fit:cover;flex-shrink:0;" />
+              <div>
+                <p style="margin:0;font-size:13px;font-weight:600;color:#111827;">デカ盛り唐揚げ定食</p>
+                <p style="margin:3px 0 0;font-size:12px;color:#6b7280;">海老名SA 下り</p>
+              </div>
+            </div>
+            <!-- 共有先アイコン -->
+            <div style="display:flex;justify-content:space-around;padding:16px 20px 12px;">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+                <div style="width:56px;height:56px;border-radius:16px;background:#06c755;display:flex;align-items:center;justify-content:center;">
+                  <svg width="30" height="30" viewBox="0 0 36 36" fill="none"><path d="M18 3C10.268 3 4 8.477 4 15.2c0 3.994 2.178 7.537 5.572 9.904L8.4 30l5.454-2.865C15.195 27.37 16.58 27.6 18 27.6c7.732 0 14-5.477 14-12.4S25.732 3 18 3z" fill="white"/></svg>
+                </div>
+                <span style="font-size:11px;color:#374151;">LINE</span>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+                <div style="width:56px;height:56px;border-radius:16px;background:#000;display:flex;align-items:center;justify-content:center;">
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="white"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                </div>
+                <span style="font-size:11px;color:#374151;">X（旧Twitter）</span>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+                <div style="width:56px;height:56px;border-radius:16px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;"><i data-lucide="link" class="w-6 h-6 text-gray-600"></i></div>
+                <span style="font-size:11px;color:#374151;">リンクをコピー</span>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+                <div style="width:56px;height:56px;border-radius:16px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;"><i data-lucide="more-horizontal" class="w-6 h-6 text-gray-600"></i></div>
+                <span style="font-size:11px;color:#374151;">その他</span>
+              </div>
+            </div>
+            <div style="margin:0 16px 8px;"><button style="width:100%;padding:14px;background:#f3f4f6;border:none;border-radius:12px;font-size:15px;color:#374151;font-weight:500;cursor:pointer;">キャンセル</button></div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1" style="position:relative;z-index:1;">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="home" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="search" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============ SECTION B ============ -->
+  <div>
+    <h2 style="margin:0 0 18px;font-size:15px;font-weight:700;color:#374151;letter-spacing:.02em;">② 発見・通知・保存</h2>
+    <div style="display:flex;gap:48px;align-items:flex-start;">
+
+      <!-- SEARCH -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">検索</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">search · SearchScreen</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-gray-50">
+              <div class="bg-white border-b border-gray-200 px-4 pt-4 pb-3 sticky top-0 z-10">
+                <div class="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2">
+                  <i data-lucide="search" class="w-4 h-4 text-gray-400 flex-shrink-0"></i>
+                  <input type="text" placeholder="ユーザー名・料理・場所で検索" class="flex-1 bg-transparent text-sm outline-none" />
+                </div>
+              </div>
+              <div class="flex-1 overflow-y-auto pb-4 scr">
+                <div class="px-4 pt-5 space-y-6">
+                  <div>
+                    <div class="flex items-center justify-between mb-3"><p class="text-xs text-gray-500 font-medium">最近の検索</p><button class="text-xs text-gray-400">すべて削除</button></div>
+                    <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                      <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100"><i data-lucide="clock" class="w-4 h-4 text-gray-300 flex-shrink-0"></i><button class="flex-1 text-left text-sm text-gray-700">海老名SA</button><button><i data-lucide="x" class="w-4 h-4 text-gray-300"></i></button></div>
+                      <div class="flex items-center gap-3 px-4 py-3"><i data-lucide="clock" class="w-4 h-4 text-gray-300 flex-shrink-0"></i><button class="flex-1 text-left text-sm text-gray-700">デカ盛り</button><button><i data-lucide="x" class="w-4 h-4 text-gray-300"></i></button></div>
+                    </div>
+                  </div>
+                  <div>
+                    <p class="text-xs text-gray-500 font-medium mb-3">よく検索されるキーワード</p>
+                    <div class="flex flex-wrap gap-2">
+                      <button class="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-700 shadow-sm">デカ盛り</button>
+                      <button class="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-700 shadow-sm">ラーメン</button>
+                      <button class="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-700 shadow-sm">SA・PA</button>
+                      <button class="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-700 shadow-sm">深夜飯</button>
+                      <button class="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-700 shadow-sm">大型車OK</button>
+                      <button class="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-700 shadow-sm">朝定食</button>
+                      <button class="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-700 shadow-sm">定食</button>
+                      <button class="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-700 shadow-sm">長距離</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="home" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-[#ff6b35]"><i data-lucide="search" class="w-5 h-5"></i></span><span class="text-[10px] text-[#ff6b35]">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- NOTIFICATIONS -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">通知</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">notifications · NotificationScreen</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-gray-50">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
+                <div class="flex items-center justify-between"><h1 class="text-lg font-medium text-gray-900">通知</h1><button class="text-xs text-[#ff6b35]">すべて既読にする</button></div>
+              </header>
+              <div class="flex-1 overflow-y-auto pb-4 scr">
+                <p class="text-xs text-gray-500 font-medium px-4 pt-4 pb-2">新着 <span class="ml-1 px-1.5 py-0.5 bg-[#ff6b35] text-white rounded-full">4</span></p>
+                <div class="bg-white divide-y divide-gray-100">
+                  <button class="w-full flex items-start gap-3 px-4 py-3.5 text-left bg-orange-50/40">
+                    <div class="relative flex-shrink-0"><img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop" class="w-11 h-11 rounded-full object-cover" /><div class="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-orange-50 rounded-full flex items-center justify-center border-2 border-white"><i data-lucide="user-plus" class="w-2.5 h-2.5 text-[#ff6b35]"></i></div></div>
+                    <div class="flex-1 min-w-0"><p class="text-sm text-gray-800 leading-snug"><span class="font-medium">北海道長距離ケン</span><span class="text-gray-600">があなたをフォローしました</span></p><p class="text-xs text-gray-400 mt-0.5">5分前</p></div>
+                    <div class="w-2 h-2 bg-[#ff6b35] rounded-full flex-shrink-0 mt-1.5"></div>
+                  </button>
+                  <button class="w-full flex items-start gap-3 px-4 py-3.5 text-left bg-orange-50/40">
+                    <div class="relative flex-shrink-0"><img src="https://images.unsplash.com/photo-1624395213043-fa2e123b2656?w=150&h=150&fit=crop" class="w-11 h-11 rounded-full object-cover" /><div class="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-red-50 rounded-full flex items-center justify-center border-2 border-white"><i data-lucide="heart" class="w-2.5 h-2.5 text-red-400"></i></div></div>
+                    <div class="flex-1 min-w-0"><p class="text-sm text-gray-800 leading-snug"><span class="font-medium">夜景トレーラー</span><span class="text-gray-600">があなたの投稿にいいねしました</span></p><p class="text-xs text-gray-400 mt-0.5">12分前</p></div>
+                    <img src="https://images.unsplash.com/photo-1602273660127-a0000560a4c1?w=150&h=150&fit=crop" class="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                  </button>
+                  <button class="w-full flex items-start gap-3 px-4 py-3.5 text-left bg-orange-50/40">
+                    <div class="relative flex-shrink-0"><img src="https://images.unsplash.com/photo-1630572780070-fce8b9e1e7e7?w=150&h=150&fit=crop" class="w-11 h-11 rounded-full object-cover" /><div class="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-blue-50 rounded-full flex items-center justify-center border-2 border-white"><i data-lucide="message-circle" class="w-2.5 h-2.5 text-blue-400"></i></div></div>
+                    <div class="flex-1 min-w-0"><p class="text-sm text-gray-800 leading-snug"><span class="font-medium">地場めしユウ</span><span class="text-gray-600">がコメントしました</span></p><p class="text-xs text-gray-500 mt-0.5 truncate">「ここ最高ですよね！自分も先週行きました」</p><p class="text-xs text-gray-400 mt-0.5">1時間前</p></div>
+                    <img src="https://images.unsplash.com/photo-1602273660127-a0000560a4c1?w=150&h=150&fit=crop" class="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                  </button>
+                </div>
+                <p class="text-xs text-gray-500 font-medium px-4 pt-4 pb-2">過去の通知</p>
+                <div class="bg-white divide-y divide-gray-100">
+                  <button class="w-full flex items-start gap-3 px-4 py-3.5 text-left">
+                    <div class="relative flex-shrink-0"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop" class="w-11 h-11 rounded-full object-cover" /><div class="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-red-50 rounded-full flex items-center justify-center border-2 border-white"><i data-lucide="heart" class="w-2.5 h-2.5 text-red-400"></i></div></div>
+                    <div class="flex-1 min-w-0"><p class="text-sm text-gray-800 leading-snug"><span class="font-medium">九州便のヒロ</span><span class="text-gray-600">があなたの投稿にいいねしました</span></p><p class="text-xs text-gray-400 mt-0.5">3時間前</p></div>
+                    <img src="https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=150&h=150&fit=crop" class="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="home" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="search" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- FAVORITES TAB: ドライバー飯 -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">お気に入り（ドライバー飯タブ）</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">favorites · FavoritesScreen</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-gray-50">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
+                <div class="flex items-center justify-between"><h1 class="text-lg font-medium text-gray-900">お気に入り</h1><div class="flex items-center gap-1"><i data-lucide="heart" class="w-4 h-4 text-[#ff6b35]"></i><span class="text-sm text-[#ff6b35]">6件</span></div></div>
+              </header>
+              <!-- タブ切り替え -->
+              <div class="bg-white border-b border-gray-200 flex">
+                <button class="flex-1 py-3 text-sm font-medium border-b-2 border-[#ff6b35] text-[#ff6b35]">ドライバー飯</button>
+                <button class="flex-1 py-3 text-sm border-b-2 border-transparent text-gray-500">ギャラリー</button>
+              </div>
+              <!-- タグフィルター -->
+              <div class="bg-white border-b border-gray-100 px-4 py-2 flex gap-2 overflow-x-auto no-scrollbar">
+                <button class="px-3 py-1.5 rounded-full text-xs whitespace-nowrap flex-shrink-0 bg-gray-100 text-gray-600">デカ盛り</button>
+                <button class="px-3 py-1.5 rounded-full text-xs whitespace-nowrap flex-shrink-0 bg-gray-100 text-gray-600">長距離</button>
+                <button class="px-3 py-1.5 rounded-full text-xs whitespace-nowrap flex-shrink-0 bg-gray-100 text-gray-600">深夜飯</button>
+                <button class="px-3 py-1.5 rounded-full text-xs whitespace-nowrap flex-shrink-0 bg-gray-100 text-gray-600">ラーメン</button>
+                <button class="px-3 py-1.5 rounded-full text-xs whitespace-nowrap flex-shrink-0 bg-gray-100 text-gray-600">朝定食</button>
+              </div>
+              <div class="flex-1 overflow-y-auto pb-4 scr">
+                <div class="px-4 pt-4 space-y-3">
+                  <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <div class="flex gap-3 p-3">
+                      <img src="https://images.unsplash.com/photo-1602273660127-a0000560a4c1?w=800&h=600&fit=crop" class="w-24 h-24 rounded-xl object-cover flex-shrink-0" />
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-1"><div class="min-w-0"><p class="text-sm font-medium leading-snug">デカ盛り唐揚げ定食</p><p class="text-xs text-gray-500 mt-0.5">海老名SA 下り</p></div><button class="p-1 rounded-full flex-shrink-0"><i data-lucide="x" class="w-4 h-4 text-gray-300"></i></button></div>
+                        <div class="flex items-center gap-2 mt-1 text-xs text-gray-400"><span>1,280円</span><span class="flex items-center gap-0.5"><i data-lucide="map-pin" class="w-3 h-3"></i>神奈川県海老名市</span></div>
+                        <span class="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 bg-green-50 text-green-700 text-xs rounded-full"><i data-lucide="truck" class="w-3 h-3"></i>大型車OK</span>
+                      </div>
+                    </div>
+                    <div class="flex items-center px-3 pb-3 gap-2"><img src="https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=150&h=150&fit=crop" class="w-5 h-5 rounded-full object-cover" /><span class="text-xs text-gray-400 flex-1">関西便のタカ</span><span class="text-xs text-gray-300">1日前に保存</span><div class="flex items-center gap-3 ml-2 text-xs text-gray-400"><span class="flex items-center gap-1"><i data-lucide="heart" class="w-3.5 h-3.5"></i>124</span><span class="flex items-center gap-1"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i>18</span></div></div>
+                  </div>
+                  <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <div class="flex gap-3 p-3">
+                      <img src="https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800&h=600&fit=crop" class="w-24 h-24 rounded-xl object-cover flex-shrink-0" />
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-1"><div class="min-w-0"><p class="text-sm font-medium leading-snug">特製味噌ラーメン</p><p class="text-xs text-gray-500 mt-0.5">湾岸ラーメン 夜王</p></div><button class="p-1 rounded-full flex-shrink-0"><i data-lucide="x" class="w-4 h-4 text-gray-300"></i></button></div>
+                        <div class="flex items-center gap-2 mt-1 text-xs text-gray-400"><span>950円</span><span class="flex items-center gap-0.5"><i data-lucide="map-pin" class="w-3 h-3"></i>東京都江東区</span></div>
+                        <span class="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 bg-green-50 text-green-700 text-xs rounded-full"><i data-lucide="truck" class="w-3 h-3"></i>大型車OK</span>
+                      </div>
+                    </div>
+                    <div class="flex items-center px-3 pb-3 gap-2"><img src="https://images.unsplash.com/photo-1624395213043-fa2e123b2656?w=150&h=150&fit=crop" class="w-5 h-5 rounded-full object-cover" /><span class="text-xs text-gray-400 flex-1">夜景トレーラー</span><span class="text-xs text-gray-300">3日前に保存</span><div class="flex items-center gap-3 ml-2 text-xs text-gray-400"><span class="flex items-center gap-1"><i data-lucide="heart" class="w-3.5 h-3.5"></i>156</span><span class="flex items-center gap-1"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i>24</span></div></div>
+                  </div>
+                  <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <div class="flex gap-3 p-3">
+                      <img src="https://images.unsplash.com/photo-1547559101-69ffc8762cb2?w=800&h=600&fit=crop" class="w-24 h-24 rounded-xl object-cover flex-shrink-0" />
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-1"><div class="min-w-0"><p class="text-sm font-medium leading-snug">朝定食セット</p><p class="text-xs text-gray-500 mt-0.5">食堂まつり</p></div><button class="p-1 rounded-full flex-shrink-0"><i data-lucide="x" class="w-4 h-4 text-gray-300"></i></button></div>
+                        <div class="flex items-center gap-2 mt-1 text-xs text-gray-400"><span>780円</span><span class="flex items-center gap-0.5"><i data-lucide="map-pin" class="w-3 h-3"></i>埼玉県川口市</span></div>
+                        <span class="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 bg-green-50 text-green-700 text-xs rounded-full"><i data-lucide="truck" class="w-3 h-3"></i>大型車OK</span>
+                      </div>
+                    </div>
+                    <div class="flex items-center px-3 pb-3 gap-2"><img src="https://images.unsplash.com/photo-1630572780070-fce8b9e1e7e7?w=150&h=150&fit=crop" class="w-5 h-5 rounded-full object-cover" /><span class="text-xs text-gray-400 flex-1">地場めしユウ</span><span class="text-xs text-gray-300">5日前に保存</span><div class="flex items-center gap-3 ml-2 text-xs text-gray-400"><span class="flex items-center gap-1"><i data-lucide="heart" class="w-3.5 h-3.5"></i>89</span><span class="flex items-center gap-1"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i>12</span></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="home" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="search" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-[#ff6b35]"></i><span class="text-[10px] text-[#ff6b35]">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- FAVORITES TAB: ギャラリー -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">お気に入り（ギャラリータブ）</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">favorites · FavoritesScreen</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-gray-50">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
+                <div class="flex items-center justify-between"><h1 class="text-lg font-medium text-gray-900">お気に入り</h1><div class="flex items-center gap-1"><i data-lucide="heart" class="w-4 h-4 text-[#ff6b35]"></i><span class="text-sm text-[#ff6b35]">6件</span></div></div>
+              </header>
+              <!-- タブ切り替え：ギャラリーがアクティブ -->
+              <div class="bg-white border-b border-gray-200 flex">
+                <button class="flex-1 py-3 text-sm border-b-2 border-transparent text-gray-500">ドライバー飯</button>
+                <button class="flex-1 py-3 text-sm font-medium border-b-2 border-[#ff6b35] text-[#ff6b35]">ギャラリー</button>
+              </div>
+              <div class="flex-1 overflow-y-auto pb-4 scr">
+                <div class="px-4 pt-4 space-y-3">
+                  <!-- ギャラリーカード1 -->
+                  <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <div class="relative">
+                      <img src="https://images.unsplash.com/photo-1604604994333-f1b0e9471186?w=800&h=450&fit=crop" class="w-full object-cover" style="height:180px;" />
+                      <span class="absolute top-2 left-2 px-2 py-0.5 bg-blue-600/80 text-white text-xs rounded flex items-center gap-1"><i data-lucide="image" class="w-3 h-3"></i>ギャラリー</span>
+                      <button class="absolute top-2 right-2 w-7 h-7 bg-black/40 rounded-full flex items-center justify-center"><i data-lucide="x" class="w-3.5 h-3.5 text-white"></i></button>
+                    </div>
+                    <div class="p-3">
+                      <p class="text-sm text-gray-800 leading-snug">深夜2時の湾岸線。今日も安全運転で行きます。</p>
+                      <div class="flex items-center gap-2 mt-2">
+                        <img src="https://images.unsplash.com/photo-1624395213043-fa2e123b2656?w=150&h=150&fit=crop" class="w-5 h-5 rounded-full object-cover" />
+                        <span class="text-xs text-gray-400 flex-1">夜景トレーラー</span>
+                        <span class="text-xs text-gray-300">2日前に保存</span>
+                        <div class="flex items-center gap-3 text-xs text-gray-400"><span class="flex items-center gap-1"><i data-lucide="heart" class="w-3.5 h-3.5"></i>89</span><span class="flex items-center gap-1"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i>12</span></div>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- ギャラリーカード2 -->
+                  <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <div class="relative">
+                      <img src="https://images.unsplash.com/photo-1651052585172-b29f8e24ccc4?w=800&h=450&fit=crop" class="w-full object-cover" style="height:180px;" />
+                      <span class="absolute top-2 left-2 px-2 py-0.5 bg-blue-600/80 text-white text-xs rounded flex items-center gap-1"><i data-lucide="image" class="w-3 h-3"></i>ギャラリー</span>
+                      <button class="absolute top-2 right-2 w-7 h-7 bg-black/40 rounded-full flex items-center justify-center"><i data-lucide="x" class="w-3.5 h-3.5 text-white"></i></button>
+                    </div>
+                    <div class="p-3">
+                      <p class="text-sm text-gray-800 leading-snug">朝焼けの荷下ろし前。今日も一日よろしくお願いします。</p>
+                      <div class="flex items-center gap-2 mt-2">
+                        <img src="https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=150&h=150&fit=crop" class="w-5 h-5 rounded-full object-cover" />
+                        <span class="text-xs text-gray-400 flex-1">関西便のタカ</span>
+                        <span class="text-xs text-gray-300">4日前に保存</span>
+                        <div class="flex items-center gap-3 text-xs text-gray-400"><span class="flex items-center gap-1"><i data-lucide="heart" class="w-3.5 h-3.5"></i>145</span><span class="flex items-center gap-1"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i>16</span></div>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- ギャラリーカード3 -->
+                  <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <div class="relative">
+                      <img src="https://images.unsplash.com/photo-1699444115784-8025ce1da6b3?w=800&h=450&fit=crop" class="w-full object-cover" style="height:180px;" />
+                      <span class="absolute top-2 left-2 px-2 py-0.5 bg-blue-600/80 text-white text-xs rounded flex items-center gap-1"><i data-lucide="image" class="w-3 h-3"></i>ギャラリー</span>
+                      <button class="absolute top-2 right-2 w-7 h-7 bg-black/40 rounded-full flex items-center justify-center"><i data-lucide="x" class="w-3.5 h-3.5 text-white"></i></button>
+                    </div>
+                    <div class="p-3">
+                      <p class="text-sm text-gray-800 leading-snug">今日の積み込み前。天気もよくて気持ちいい朝です。</p>
+                      <div class="flex items-center gap-2 mt-2">
+                        <img src="https://images.unsplash.com/photo-1630572780070-fce8b9e1e7e7?w=150&h=150&fit=crop" class="w-5 h-5 rounded-full object-cover" />
+                        <span class="text-xs text-gray-400 flex-1">地場めしユウ</span>
+                        <span class="text-xs text-gray-300">1週間前に保存</span>
+                        <div class="flex items-center gap-3 text-xs text-gray-400"><span class="flex items-center gap-1"><i data-lucide="heart" class="w-3.5 h-3.5"></i>67</span><span class="flex items-center gap-1"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i>8</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="home" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="search" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-[#ff6b35]"></i><span class="text-[10px] text-[#ff6b35]">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============ SECTION C ============ -->
+  <div>
+    <h2 style="margin:0 0 18px;font-size:15px;font-weight:700;color:#374151;letter-spacing:.02em;">③ 投稿</h2>
+    <div style="display:flex;gap:48px;align-items:flex-start;">
+
+      <!-- POST -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">ドライバー飯を投稿</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">post · PostScreen</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-gray-50">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+                <button><i data-lucide="x" class="w-6 h-6 text-gray-700"></i></button>
+                <h1 class="text-base font-medium text-gray-900">ドライバー飯を投稿</h1>
+                <button class="px-4 py-1.5 rounded-full text-sm font-medium bg-gray-200 text-gray-400">投稿</button>
+              </header>
+              <div class="flex-1 overflow-y-auto pb-8 scr">
+                <div class="bg-white px-4 pt-4 pb-3 mb-2">
+                  <div class="flex items-center justify-between mb-2"><p class="text-sm font-medium text-gray-900">写真 <span class="text-[#ff6b35]">*</span></p><span class="text-xs text-gray-400">0 / 3枚</span></div>
+                  <div class="flex gap-2">
+                    <button class="w-24 h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 flex-shrink-0 border-[#ff6b35] bg-orange-50"><i data-lucide="plus" class="w-6 h-6 text-[#ff6b35]"></i><span class="text-xs text-[#ff6b35]">写真を追加</span></button>
+                  </div>
+                  <p class="text-xs text-gray-400 mt-2">最大3枚まで。1枚目が表紙になります。</p>
+                </div>
+                <div class="bg-white px-4 py-4 mb-2 space-y-4">
+                  <div><label class="block text-sm font-medium text-gray-700 mb-1">メニュー名 <span class="text-[#ff6b35]">*</span></label><input type="text" placeholder="例：デカ盛り唐揚げ定食" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" /></div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">店名 <span class="text-gray-400 font-normal">（任意）</span></label>
+                    <div class="relative">
+                      <input type="text" value="食堂ま" class="w-full px-3 py-2.5 border border-[#ff6b35] rounded-lg text-sm focus:outline-none" />
+                      <!-- サジェストドロップダウン（入力中の状態） -->
+                      <div class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 overflow-hidden">
+                        <p class="px-3 pt-2 pb-1 text-xs text-gray-400">近くの店から候補</p>
+                        <button class="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-gray-50 border-b border-gray-50">
+                          <i data-lucide="utensils" class="w-4 h-4 text-gray-400 flex-shrink-0"></i>
+                          <div class="flex-1 min-w-0"><p class="text-sm text-gray-800 truncate">食堂まつり</p><p class="text-xs text-gray-400 truncate">埼玉県川口市 ・ 約120m</p></div>
+                        </button>
+                        <button class="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-gray-50 border-b border-gray-50">
+                          <i data-lucide="utensils" class="w-4 h-4 text-gray-400 flex-shrink-0"></i>
+                          <div class="flex-1 min-w-0"><p class="text-sm text-gray-800 truncate">街道食堂 まるよし</p><p class="text-xs text-gray-400 truncate">埼玉県川口市 ・ 約450m</p></div>
+                        </button>
+                        <!-- 自由入力フォールバック -->
+                        <button class="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-orange-50 bg-orange-50/50">
+                          <i data-lucide="plus-circle" class="w-4 h-4 text-[#ff6b35] flex-shrink-0"></i>
+                          <p class="text-sm text-[#ff6b35] font-medium">「食堂ま」を新しい店として登録</p>
+                        </button>
+                      </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1.5">候補から選ぶと表記が揃います。なければそのまま入力してOK（SA・PAの自販機飯や路肩の弁当もそのまま投稿できます）</p>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">場所 <span class="text-[#ff6b35]">*</span></label>
+                    <!-- 地図で選択済みの状態 -->
+                    <button class="w-full flex items-center gap-3 px-3 py-2.5 border border-gray-200 rounded-lg text-left bg-white">
+                      <div class="w-9 h-9 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0"><i data-lucide="map-pin" class="w-5 h-5 text-[#ff6b35]"></i></div>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-sm text-gray-800 truncate">神奈川県海老名市大谷南</p>
+                        <p class="text-xs text-gray-400 mt-0.5">35.4344, 139.3899</p>
+                      </div>
+                      <span class="text-xs text-[#ff6b35] font-medium flex-shrink-0">地図で変更</span>
+                    </button>
+                    <p class="text-xs text-gray-400 mt-1.5">📍 地図で実際の位置を指定すると、近くのドライバーに届きやすくなります</p>
+                  </div>
+                  <div><label class="block text-sm font-medium text-gray-700 mb-1">金額（円）</label><input type="number" placeholder="例：1280" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" /></div>
+                </div>
+                <div class="bg-white px-4 py-3 mb-2">
+                  <button class="w-full flex items-center justify-between">
+                    <div class="flex items-center gap-2"><i data-lucide="truck" class="w-5 h-5 text-gray-500"></i><span class="text-sm text-gray-800">大型車OKの店</span></div>
+                    <div class="w-12 h-6 rounded-full bg-gray-200"><div class="w-5 h-5 bg-white rounded-full shadow mt-0.5 translate-x-0.5"></div></div>
+                  </button>
+                </div>
+                <div class="bg-white px-4 py-4 mb-2">
+                  <p class="text-sm font-medium text-gray-700 mb-3">この飯のポイント（タップで選択）</p>
+                  <div class="flex flex-wrap gap-2">
+                    <button class="px-3 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600">デカ盛り</button>
+                    <button class="px-3 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600">深夜飯</button>
+                    <button class="px-3 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600">朝定食</button>
+                    <button class="px-3 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600">長距離</button>
+                    <button class="px-3 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600">地元飯</button>
+                    <button class="px-3 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600">SA・PA</button>
+                    <button class="px-3 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600">ラーメン</button>
+                    <button class="px-3 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600">定食</button>
+                    <button class="px-3 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600">駐車場広め</button>
+                    <button class="px-3 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600">大型車OK</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="home" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="search" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- LOCATION PICKER (MAP) -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">地図で場所を選択</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">location-picker · LocationPickerScreen · ZENRIN Maps API（検証環境）</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-white">
+              <!-- ヘッダー -->
+              <header class="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 z-20">
+                <button><i data-lucide="arrow-left" class="w-6 h-6 text-gray-700"></i></button>
+                <h1 class="text-base font-medium text-gray-900 flex-1">場所を選択</h1>
+              </header>
+              <!-- 検索バー -->
+              <div class="px-4 py-2.5 border-b border-gray-100 z-20">
+                <div class="flex items-center gap-2 bg-gray-100 rounded-xl px-3 py-2">
+                  <i data-lucide="search" class="w-4 h-4 text-gray-400 flex-shrink-0"></i>
+                  <input type="text" placeholder="住所・施設名で検索" class="flex-1 bg-transparent text-sm outline-none" />
+                </div>
+              </div>
+              <!-- 地図エリア -->
+              <div class="relative flex-1 min-h-0">
+                <div id="dorameshi-zmap" style="position:absolute;inset:0;background:#e5e7eb;"></div>
+                <!-- 中央固定ピン（地図に固定・常に中央。位置選択の標準UI） -->
+                <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-100%);pointer-events:none;z-index:500;">
+                  <div style="display:flex;flex-direction:column;align-items:center;">
+                    <div style="background:#ff6b35;width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 3px 8px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;">
+                      <div style="transform:rotate(45deg);color:#fff;font-size:16px;">🍚</div>
+                    </div>
+                    <div style="width:8px;height:8px;background:rgba(0,0,0,.25);border-radius:50%;margin-top:1px;filter:blur(1px);"></div>
+                  </div>
+                </div>
+                <!-- 操作ヒント -->
+                <div style="position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:500;pointer-events:none;" class="bg-black/65 text-white text-xs px-3 py-1.5 rounded-full whitespace-nowrap">地図を動かしてピンを合わせてください</div>
+                <!-- 現在地ボタン -->
+                <button style="position:absolute;right:14px;bottom:16px;z-index:500;" class="w-11 h-11 bg-white rounded-full shadow-lg flex items-center justify-center"><i data-lucide="locate-fixed" class="w-5 h-5 text-[#ff6b35]"></i></button>
+              </div>
+              <!-- 下部確定カード -->
+              <div class="border-t border-gray-200 bg-white px-4 pt-3 pb-4 z-20">
+                <div class="flex items-start gap-3 mb-3">
+                  <div class="w-9 h-9 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="map-pin" class="w-5 h-5 text-[#ff6b35]"></i></div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900">神奈川県海老名市大谷南</p>
+                    <p class="text-xs text-gray-400 mt-0.5">緯度 <span id="map-lat">35.4344</span> ／ 経度 <span id="map-lng">139.3899</span></p>
+                  </div>
+                </div>
+                <button class="w-full py-3 bg-[#ff6b35] text-white rounded-xl font-medium">この場所に決定</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GALLERY-POST -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">ギャラリーに投稿</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">gallery-post · GalleryPostScreen</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-gray-50">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+                <button><i data-lucide="x" class="w-6 h-6 text-gray-700"></i></button>
+                <h1 class="text-base font-medium text-gray-900">ギャラリーに投稿</h1>
+                <button class="px-4 py-1.5 rounded-full text-sm font-medium bg-gray-200 text-gray-400">投稿</button>
+              </header>
+              <div class="flex-1 overflow-y-auto pb-8 scr">
+                <div class="bg-white px-4 pt-4 pb-3 mb-2">
+                  <div class="flex items-center justify-between mb-2"><p class="text-sm font-medium text-gray-900">写真 <span class="text-[#ff6b35]">*</span></p><span class="text-xs text-gray-400">0 / 3枚</span></div>
+                  <div class="flex gap-2">
+                    <button class="w-24 h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 flex-shrink-0 border-[#ff6b35] bg-orange-50"><i data-lucide="plus" class="w-6 h-6 text-[#ff6b35]"></i><span class="text-xs text-[#ff6b35]">写真を追加</span></button>
+                  </div>
+                  <p class="text-xs text-gray-400 mt-2">走行中の風景・トラック・仕事風景など</p>
+                </div>
+                <div class="bg-white px-4 py-4 mb-2">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">コメント</label>
+                  <textarea placeholder="今日の一コマを一言どうぞ" rows="3" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm resize-none"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="home" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="search" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- POST OPTIONS BOTTOM SHEET -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;">
+          <span style="font-size:13px;font-weight:600;color:#111827;">投稿種別選択（ボトムシート）</span>
+          <span style="font-size:11px;color:#9ca3af;font-family:monospace;">overlay · showPostOptions</span>
+        </div>
+        <div style="font-size:11px;color:#6b7280;margin-bottom:8px;padding:6px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;">
+          ＋ボタンタップ時のオーバーレイ。背景は<code style="font-size:10px;">feed</code>画面。
+        </div>
+        <div style="width:390px;height:844px;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;position:relative;">
+          <!-- 背景：feedスクリーン（薄暗く） -->
+          <div style="position:absolute;inset:0;background:#fff;display:flex;flex-direction:column;">
+            <header class="bg-white border-b border-gray-200 px-4 py-3">
+              <div class="flex items-center justify-between">
+                <h1 class="text-xl text-[#ff6b35]">トラックドライバー飯</h1>
+                <button class="p-2 relative"><i data-lucide="bell" class="w-5 h-5 text-gray-700"></i><span class="absolute top-1 right-1 w-2 h-2 bg-[#ff6b35] rounded-full"></span></button>
+              </div>
+              <div class="flex gap-4 mt-3 overflow-x-auto no-scrollbar">
+                <button class="text-sm pb-2 border-b-2 whitespace-nowrap border-[#ff6b35] text-[#ff6b35]">おすすめ</button>
+                <button class="text-sm pb-2 border-b-2 whitespace-nowrap border-transparent text-gray-400">フォロー中</button>
+                <button class="text-sm pb-2 border-b-2 whitespace-nowrap border-transparent text-gray-400">SA・PA</button>
+              </div>
+            </header>
+            <div style="flex:1;overflow:hidden;position:relative;">
+              <div style="padding:12px 16px;opacity:.35;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                  <img src="https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=150&h=150&fit=crop" style="width:40px;height:40px;border-radius:50%;object-fit:cover;" />
+                  <div><p style="font-size:13px;margin:0;">関西便のタカ</p><p style="font-size:11px;color:#6b7280;margin:2px 0 0;">大型ウイング | 関東〜関西</p></div>
+                </div>
+                <img src="https://images.unsplash.com/photo-1602273660127-a0000560a4c1?w=800&h=600&fit=crop" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;" />
+              </div>
+            </div>
+            <nav style="background:#fff;border-top:1px solid #e5e7eb;display:flex;align-items:center;padding:4px 8px;opacity:.35;">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:2px;"><i data-lucide="home" style="width:20px;height:20px;color:#9ca3af;"></i><span style="font-size:10px;color:#9ca3af;">ホーム</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:2px;"><i data-lucide="search" style="width:20px;height:20px;color:#9ca3af;"></i><span style="font-size:10px;color:#9ca3af;">検索</span></div>
+              <div style="flex:1;display:flex;justify-content:center;">
+                <div style="width:48px;height:48px;background:#ff6b35;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-top:-16px;box-shadow:0 4px 12px rgba(255,107,53,.45);">
+                  <i data-lucide="plus" style="width:24px;height:24px;color:#fff;"></i>
+                </div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:2px;"><i data-lucide="heart" style="width:20px;height:20px;color:#9ca3af;"></i><span style="font-size:10px;color:#9ca3af;">お気に入り</span></div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:2px;"><i data-lucide="user" style="width:20px;height:20px;color:#9ca3af;"></i><span style="font-size:10px;color:#9ca3af;">マイページ</span></div>
+            </nav>
+          </div>
+          <!-- 暗い背景幕 -->
+          <div style="position:absolute;inset:0;background:rgba(0,0,0,.40);"></div>
+          <!-- ボトムシート本体 -->
+          <div style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:20px 20px 0 0;padding:20px 16px 28px;">
+            <p style="text-align:center;font-size:14px;font-weight:500;color:#374151;margin:0 0 14px;">何を投稿しますか？</p>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <button style="width:100%;display:flex;align-items:center;gap:16px;padding:16px;background:#fff7ed;border-radius:14px;border:1px solid #fed7aa;cursor:default;">
+                <div style="width:40px;height:40px;background:#ff6b35;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i data-lucide="utensils" style="width:20px;height:20px;color:#fff;"></i>
+                </div>
+                <div style="text-align:left;">
+                  <p style="font-size:14px;font-weight:500;color:#111827;margin:0;">ドライバー飯を投稿</p>
+                  <p style="font-size:12px;color:#6b7280;margin:4px 0 0;">食べた飯の写真・店情報をシェア</p>
+                </div>
+              </button>
+              <button style="width:100%;display:flex;align-items:center;gap:16px;padding:16px;background:#f9fafb;border-radius:14px;border:1px solid #f3f4f6;cursor:default;">
+                <div style="width:40px;height:40px;background:#9ca3af;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <i data-lucide="image" style="width:20px;height:20px;color:#fff;"></i>
+                </div>
+                <div style="text-align:left;">
+                  <p style="font-size:14px;font-weight:500;color:#111827;margin:0;">ギャラリーに投稿</p>
+                  <p style="font-size:12px;color:#6b7280;margin:4px 0 0;">風景・トラック・仕事の一コマをシェア</p>
+                </div>
+              </button>
+              <button style="width:100%;padding:12px;font-size:14px;color:#9ca3af;cursor:default;">キャンセル</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============ SECTION D ============ -->
+  <div>
+    <h2 style="margin:0 0 18px;font-size:15px;font-weight:700;color:#374151;letter-spacing:.02em;">④ プロフィール・マイページ</h2>
+    <div style="display:flex;gap:48px;align-items:flex-start;">
+
+      <!-- DRIVER-PROFILE -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">ドライバープロフィール（他者）</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">driver-profile · DriverProfile</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-gray-50 overflow-y-auto scr">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10"><div class="flex items-center gap-3"><button><i data-lucide="arrow-left" class="w-6 h-6 text-gray-700"></i></button><h1 class="text-lg font-medium flex-1">プロフィール</h1></div></header>
+              <div class="relative w-full h-48 bg-gradient-to-r from-orange-400 to-red-500"><img src="https://images.unsplash.com/photo-1636070762406-4262052fa6ef?w=800&h=400&fit=crop" class="w-full h-full object-cover opacity-80" /></div>
+              <div class="bg-white px-4 pb-4 -mt-8 relative z-10">
+                <div class="flex items-end justify-between mb-3">
+                  <img src="https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=150&h=150&fit=crop" class="w-24 h-24 rounded-full border-4 border-white object-cover shadow-lg" />
+                  <button class="px-6 py-2 bg-[#ff6b35] text-white text-sm rounded-full">フォローする</button>
+                </div>
+                <h2 class="text-xl mb-2">関西便のタカ</h2>
+                <div class="flex gap-4 text-sm mb-3"><div><span>投稿 </span><span class="font-medium">128</span></div><div><span>フォロワー </span><span class="font-medium">540</span></div><div><span>いいね </span><span class="font-medium">3,210</span></div></div>
+                <p class="text-sm text-gray-600 mb-3">大型ウイング｜関東〜関西｜ドライバー歴12年</p>
+                <p class="text-sm text-gray-700 mb-3">大型車OKの食堂と深夜ラーメンを中心に投稿しています。</p>
+                <div class="flex flex-wrap gap-2"><span class="px-3 py-1 bg-orange-50 text-[#ff6b35] text-xs rounded-full border border-orange-200">大型ウイング</span><span class="px-3 py-1 bg-orange-50 text-[#ff6b35] text-xs rounded-full border border-orange-200">長距離</span><span class="px-3 py-1 bg-orange-50 text-[#ff6b35] text-xs rounded-full border border-orange-200">関東〜関西</span><span class="px-3 py-1 bg-orange-50 text-[#ff6b35] text-xs rounded-full border border-orange-200">デカ盛り</span><span class="px-3 py-1 bg-orange-50 text-[#ff6b35] text-xs rounded-full border border-orange-200">深夜飯</span></div>
+              </div>
+              <div class="bg-white border-y border-gray-200"><div class="flex"><button class="flex-1 py-3 text-sm border-b-2 border-[#ff6b35] text-[#ff6b35]">プロフィール</button><button class="flex-1 py-3 text-sm border-b-2 border-transparent text-gray-600">ドライバー飯</button><button class="flex-1 py-3 text-sm border-b-2 border-transparent text-gray-600">ギャラリー</button></div></div>
+              <div class="bg-white p-4 space-y-3">
+                <div class="border border-gray-200 rounded-lg p-3"><h3 class="text-sm mb-2 text-[#ff6b35]">ドライバー情報</h3><div class="space-y-1 text-sm text-gray-700"><p><span class="text-gray-500">車種：</span>大型ウイング</p><p><span class="text-gray-500">運行スタイル：</span>長距離</p><p><span class="text-gray-500">走行エリア：</span>関東〜関西</p><p><span class="text-gray-500">ドライバー歴：</span>12年</p></div></div>
+                <div class="border border-gray-200 rounded-lg p-3"><h3 class="text-sm mb-2 text-[#ff6b35]">飯の好み</h3><div class="space-y-1 text-sm text-gray-700"><p><span class="text-gray-500">好きな飯：</span>デカ盛り、ラーメン、定食</p><p><span class="text-gray-500">よく投稿する場所：</span>SA・PA、幹線道路沿い</p><p><span class="text-gray-500">重視するポイント：</span>大型車OK、深夜営業</p></div></div>
+                <div class="border border-gray-200 rounded-lg p-3"><h3 class="text-sm mb-2 text-[#ff6b35]">実績・バッジ</h3><div class="flex flex-wrap gap-2"><span class="flex items-center gap-1 px-3 py-1 bg-yellow-50 text-yellow-700 text-xs rounded-full border border-yellow-200"><i data-lucide="award" class="w-3 h-3"></i>デカ盛りハンター</span><span class="flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 text-xs rounded-full border border-blue-200"><i data-lucide="award" class="w-3 h-3"></i>SA・PAマスター</span><span class="flex items-center gap-1 px-3 py-1 bg-green-50 text-green-700 text-xs rounded-full border border-green-200"><i data-lucide="award" class="w-3 h-3"></i>大型車OK発掘隊</span><span class="flex items-center gap-1 px-3 py-1 bg-purple-50 text-purple-700 text-xs rounded-full border border-purple-200"><i data-lucide="award" class="w-3 h-3"></i>深夜飯職人</span></div></div>
+                <div class="pt-2">
+                  <h3 class="text-sm mb-3 text-gray-700 font-medium">最近のアクティビティ</h3>
+                  <div class="space-y-4">
+                    <div class="border-l-2 border-gray-200 pl-4 pb-4">
+                      <div class="flex items-center gap-2 mb-2"><span class="px-2 py-0.5 bg-orange-50 text-[#ff6b35] text-xs rounded">ドライバー飯</span><span class="text-xs text-gray-500">1日前</span></div>
+                      <div class="w-full aspect-[4/3] rounded-lg overflow-hidden mb-2"><img src="https://images.unsplash.com/photo-1602273660127-a0000560a4c1?w=800&h=600&fit=crop" class="w-full h-full object-cover" /></div>
+                      <h4 class="text-sm font-medium mb-1">デカ盛り唐揚げ定食</h4><p class="text-xs text-gray-600">海老名SA 下り</p>
+                      <div class="flex items-center gap-4 text-xs text-gray-600 mt-2"><div class="flex items-center gap-1"><i data-lucide="heart" class="w-4 h-4"></i><span>124</span></div><div class="flex items-center gap-1"><i data-lucide="message-circle" class="w-4 h-4"></i><span>18</span></div></div>
+                    </div>
+                    <div class="border-l-2 border-gray-200 pl-4 pb-4">
+                      <div class="flex items-center gap-2 mb-2"><span class="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs rounded flex items-center gap-1"><i data-lucide="image" class="w-3 h-3"></i>ギャラリー更新</span><span class="text-xs text-gray-500">2日前</span></div>
+                      <div class="w-full aspect-[16/9] rounded-lg overflow-hidden mb-2"><img src="https://images.unsplash.com/photo-1604604994333-f1b0e9471186?w=800&h=600&fit=crop" class="w-full h-full object-cover" /></div>
+                      <p class="text-sm text-gray-700">深夜2時の湾岸線。今日も安全運転で行きます。</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="h-20"></div>
+            </div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="home" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="search" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- MYPAGE -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">マイページ（自分）</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">mypage · DriverProfile isOwnProfile</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-gray-50 overflow-y-auto scr">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10"><div class="flex items-center gap-3"><h1 class="text-lg font-medium flex-1">マイページ</h1><button class="p-1"><i data-lucide="settings" class="w-5 h-5 text-gray-600"></i></button></div></header>
+              <div class="relative w-full h-48 bg-gradient-to-r from-orange-400 to-red-500"><img src="https://images.unsplash.com/photo-1636070762406-4262052fa6ef?w=800&h=400&fit=crop" class="w-full h-full object-cover opacity-80" /></div>
+              <div class="bg-white px-4 pb-4 -mt-8 relative z-10">
+                <div class="flex items-end justify-between mb-3">
+                  <img src="https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=150&h=150&fit=crop" class="w-24 h-24 rounded-full border-4 border-white object-cover shadow-lg" />
+                  <button class="px-6 py-2 border border-gray-300 text-gray-700 text-sm rounded-full">編集する</button>
+                </div>
+                <h2 class="text-xl mb-2">関西便のタカ</h2>
+                <div class="flex gap-4 text-sm mb-3"><div><span>投稿 </span><span class="font-medium">128</span></div><div><span>フォロワー </span><span class="font-medium">540</span></div><div><span>いいね </span><span class="font-medium">3,210</span></div></div>
+                <p class="text-sm text-gray-600 mb-3">大型ウイング｜関東〜関西｜ドライバー歴12年</p>
+                <p class="text-sm text-gray-700 mb-3">大型車OKの食堂と深夜ラーメンを中心に投稿しています。</p>
+                <div class="flex flex-wrap gap-2"><span class="px-3 py-1 bg-orange-50 text-[#ff6b35] text-xs rounded-full border border-orange-200">大型ウイング</span><span class="px-3 py-1 bg-orange-50 text-[#ff6b35] text-xs rounded-full border border-orange-200">長距離</span><span class="px-3 py-1 bg-orange-50 text-[#ff6b35] text-xs rounded-full border border-orange-200">関東〜関西</span><span class="px-3 py-1 bg-orange-50 text-[#ff6b35] text-xs rounded-full border border-orange-200">デカ盛り</span><span class="px-3 py-1 bg-orange-50 text-[#ff6b35] text-xs rounded-full border border-orange-200">深夜飯</span></div>
+              </div>
+              <div class="bg-white border-y border-gray-200"><div class="flex"><button class="flex-1 py-3 text-sm border-b-2 border-[#ff6b35] text-[#ff6b35]">プロフィール</button><button class="flex-1 py-3 text-sm border-b-2 border-transparent text-gray-600">ドライバー飯</button><button class="flex-1 py-3 text-sm border-b-2 border-transparent text-gray-600">ギャラリー</button></div></div>
+              <div class="grid grid-cols-3 gap-1 p-1 bg-white" style="display:none;"></div>
+              <div class="bg-white p-4 space-y-3">
+                <div class="border border-gray-200 rounded-lg p-3"><h3 class="text-sm mb-2 text-[#ff6b35]">ドライバー情報</h3><div class="space-y-1 text-sm text-gray-700"><p><span class="text-gray-500">車種：</span>大型ウイング</p><p><span class="text-gray-500">運行スタイル：</span>長距離</p><p><span class="text-gray-500">走行エリア：</span>関東〜関西</p><p><span class="text-gray-500">ドライバー歴：</span>12年</p></div></div>
+                <div class="border border-gray-200 rounded-lg p-3"><h3 class="text-sm mb-2 text-[#ff6b35]">実績・バッジ</h3><div class="flex flex-wrap gap-2"><span class="flex items-center gap-1 px-3 py-1 bg-yellow-50 text-yellow-700 text-xs rounded-full border border-yellow-200"><i data-lucide="award" class="w-3 h-3"></i>デカ盛りハンター</span><span class="flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 text-xs rounded-full border border-blue-200"><i data-lucide="award" class="w-3 h-3"></i>SA・PAマスター</span><span class="flex items-center gap-1 px-3 py-1 bg-green-50 text-green-700 text-xs rounded-full border border-green-200"><i data-lucide="award" class="w-3 h-3"></i>大型車OK発掘隊</span><span class="flex items-center gap-1 px-3 py-1 bg-purple-50 text-purple-700 text-xs rounded-full border border-purple-200"><i data-lucide="award" class="w-3 h-3"></i>深夜飯職人</span></div></div>
+                <div class="grid grid-cols-3 gap-1 pt-1">
+                  <div class="aspect-square"><img src="https://images.unsplash.com/photo-1602273660127-a0000560a4c1?w=400&h=400&fit=crop" class="w-full h-full object-cover rounded" /></div>
+                  <div class="aspect-square"><img src="https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=400&fit=crop" class="w-full h-full object-cover rounded" /></div>
+                  <div class="aspect-square"><img src="https://images.unsplash.com/photo-1526318896980-cf78c088247c?w=400&h=400&fit=crop" class="w-full h-full object-cover rounded" /></div>
+                  <div class="aspect-square"><img src="https://images.unsplash.com/photo-1547559101-69ffc8762cb2?w=400&h=400&fit=crop" class="w-full h-full object-cover rounded" /></div>
+                  <div class="aspect-square"><img src="https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400&h=400&fit=crop" class="w-full h-full object-cover rounded" /></div>
+                  <div class="aspect-square"><img src="https://images.unsplash.com/photo-1631100732613-6b65da9a343d?w=400&h=400&fit=crop" class="w-full h-full object-cover rounded" /></div>
+                </div>
+              </div>
+              <div class="h-20"></div>
+            </div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="home" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="search" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-[#ff6b35]"></i><span class="text-[10px] text-[#ff6b35]">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- PROFILE-EDIT -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">プロフィール編集</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">profile-edit · ProfileEditScreen</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-gray-50">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10"><button><i data-lucide="x" class="w-6 h-6 text-gray-700"></i></button><h1 class="text-base font-medium text-gray-900">プロフィール編集</h1><button class="px-4 py-1.5 bg-[#ff6b35] text-white rounded-full text-sm font-medium">保存</button></header>
+              <div class="flex-1 overflow-y-auto pb-10 scr">
+                <div class="relative mb-16">
+                  <div class="relative w-full h-44 bg-gray-200"><img src="https://images.unsplash.com/photo-1636070762406-4262052fa6ef?w=800&h=400&fit=crop" class="w-full h-full object-cover" /><div class="absolute inset-0 bg-black/20"></div><div class="absolute inset-0 flex flex-col items-center justify-center gap-1.5"><div class="w-10 h-10 bg-black/40 rounded-full flex items-center justify-center"><i data-lucide="camera" class="w-5 h-5 text-white"></i></div><span class="text-white text-xs font-medium drop-shadow">背景写真を変更</span></div></div>
+                  <div class="absolute -bottom-12 left-4"><div class="relative w-24 h-24"><img src="https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=150&h=150&fit=crop" class="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg" /><div class="absolute inset-0 rounded-full bg-black/30 flex flex-col items-center justify-center gap-0.5"><i data-lucide="camera" class="w-5 h-5 text-white"></i><span class="text-white text-[10px] font-medium">変更</span></div></div></div>
+                </div>
+                <div class="px-4 mb-4"><p class="text-xs text-gray-400">📸 自分のトラックや走行シーンをセットして、かっこよく見せよう</p></div>
+                <div class="bg-white px-4 py-4 space-y-4 mb-2">
+                  <div><label class="block text-sm font-medium text-gray-700 mb-1">ニックネーム</label><input type="text" defaultValue="たかばちーの" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm" /></div>
+                  <div><label class="block text-sm font-medium text-gray-700 mb-1">自己紹介</label><textarea placeholder="例：大型車OKの食堂と深夜ラーメンを中心に投稿しています。" rows="3" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm resize-none"></textarea></div>
+                </div>
+                <div class="bg-white px-4 py-4 space-y-4">
+                  <p class="text-xs text-gray-500 font-medium">ドライバー情報</p>
+                  <div><label class="block text-sm font-medium text-gray-700 mb-1">車種・ボディタイプ</label><select defaultValue="4t冷凍車" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white"><option>大型ウイング</option><option>大型平ボディ</option><option>4t冷凍車</option><option>2t車</option><option>トレーラー</option><option>タンクローリー</option></select></div>
+                  <div><label class="block text-sm font-medium text-gray-700 mb-1">運行スタイル</label><select defaultValue="中距離" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white"><option>長距離</option><option>中距離</option><option>地場</option><option>混載</option></select></div>
+                  <div><label class="block text-sm font-medium text-gray-700 mb-1">主な走行エリア</label><select defaultValue="関東地場" class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white"><option>関東〜関西</option><option>関東地場</option><option>関西地場</option><option>東北方面</option><option>九州方面</option><option>北海道〜関東</option><option>全国</option></select></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="home" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="search" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">アカウント情報（画像未設定）</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">settings · MyPageSettings</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-gray-50 overflow-y-auto scr">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10"><div class="flex items-center gap-3"><button><i data-lucide="arrow-left" class="w-6 h-6 text-gray-700"></i></button><h1 class="text-lg font-medium text-gray-900">アカウント情報</h1></div></header>
+              <div class="mx-4 mt-4 bg-white rounded-2xl p-5 shadow-sm">
+                <div class="flex flex-col items-center mb-4"><div class="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-3"><span class="text-2xl text-[#ff6b35] font-bold">た</span></div><p class="text-base font-bold text-gray-900">たかばちーの</p><p class="text-sm text-gray-500 mt-0.5">n_takahashi@zenrin-datacom.net</p><p class="text-xs text-gray-400 mt-1">4t冷凍車 ｜ 関東地場 ｜ 中距離</p></div>
+                <div class="flex gap-3"><button class="flex-1 text-sm text-[#ff6b35] font-medium py-2 border border-[#ff6b35] rounded-lg">自分のプロフィールを見る →</button><button class="px-4 text-sm text-gray-600 py-2 border border-gray-300 rounded-lg">ログアウト</button></div>
+              </div>
+              <div class="px-4 mt-5 space-y-4 pb-8">
+                <div>
+                  <p class="text-xs text-gray-500 font-medium mb-2 px-1">アカウント</p>
+                  <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <button class="w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-gray-100"><i data-lucide="user" class="w-5 h-5 text-gray-400 flex-shrink-0"></i><span class="flex-1 text-sm text-gray-800">プロフィール編集</span><i data-lucide="chevron-right" class="w-4 h-4 text-gray-300"></i></button>
+                    <button class="w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-gray-100"><i data-lucide="users" class="w-5 h-5 text-gray-400 flex-shrink-0"></i><span class="flex-1 text-sm text-gray-800">フォロー中</span><i data-lucide="chevron-right" class="w-4 h-4 text-gray-300"></i></button>
+                    <button class="w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-gray-100"><i data-lucide="settings" class="w-5 h-5 text-gray-400 flex-shrink-0"></i><span class="flex-1 text-sm text-gray-800">アカウント設定</span><i data-lucide="chevron-right" class="w-4 h-4 text-gray-300"></i></button>
+                    <button class="w-full flex items-center gap-3 px-4 py-3.5 text-left"><i data-lucide="shield" class="w-5 h-5 text-gray-400 flex-shrink-0"></i><span class="flex-1 text-sm text-gray-800">プライバシー設定</span><i data-lucide="chevron-right" class="w-4 h-4 text-gray-300"></i></button>
+                  </div>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-500 font-medium mb-2 px-1">サポート</p>
+                  <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <button class="w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-gray-100"><i data-lucide="help-circle" class="w-5 h-5 text-gray-400 flex-shrink-0"></i><span class="flex-1 text-sm text-gray-800">よくある質問（FAQ）</span><i data-lucide="chevron-right" class="w-4 h-4 text-gray-300"></i></button>
+                    <button class="w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-gray-100"><i data-lucide="file-text" class="w-5 h-5 text-gray-400 flex-shrink-0"></i><span class="flex-1 text-sm text-gray-800">利用規約</span><i data-lucide="chevron-right" class="w-4 h-4 text-gray-300"></i></button>
+                    <button class="w-full flex items-center gap-3 px-4 py-3.5 text-left"><i data-lucide="file-text" class="w-5 h-5 text-gray-400 flex-shrink-0"></i><span class="flex-1 text-sm text-gray-800">プライバシーポリシー</span><i data-lucide="chevron-right" class="w-4 h-4 text-gray-300"></i></button>
+                  </div>
+                </div>
+                <button class="w-full flex items-center justify-center gap-2 py-3.5 text-red-500 text-sm font-medium bg-white rounded-2xl shadow-sm"><i data-lucide="log-out" class="w-4 h-4"></i>ログアウト</button>
+              </div>
+            </div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="home" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="search" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-[#ff6b35]"></i><span class="text-[10px] text-[#ff6b35]">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- SETTINGS WITH PHOTO -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">アカウント情報（画像設定済み）</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">settings · MyPageSettings</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-gray-50 overflow-y-auto scr">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
+                <div class="flex items-center gap-3">
+                  <button><i data-lucide="arrow-left" class="w-6 h-6 text-gray-700"></i></button>
+                  <h1 class="text-lg font-medium text-gray-900">アカウント情報</h1>
+                </div>
+              </header>
+
+              <!-- カバー写真＋アバター付きカード -->
+              <div class="mx-4 mt-4 rounded-2xl shadow-sm overflow-hidden" style="position:relative;">
+                <img src="https://images.unsplash.com/photo-1574484284002-952d92456975?w=800&h=600&fit=crop" class="w-full object-cover" style="height:300px;display:block;" />
+                <div class="absolute inset-0" style="background:rgba(0,0,0,0.46);"></div>
+                <div class="absolute inset-0 flex flex-col items-center justify-center px-5 gap-1">
+                  <div class="w-16 h-16 rounded-full bg-white flex items-center justify-center mb-2 flex-shrink-0">
+                    <span class="text-2xl font-bold text-[#ff6b35]">カ</span>
+                  </div>
+                  <p class="text-xl font-bold text-white">カレーのおぉじさま☆</p>
+                  <p class="text-xs text-white/80">n_takahashi@zenrin-datacom.net</p>
+                  <p class="text-xs text-white/90 mb-3">4t冷凍車 ｜ 関東地場 ｜ 中距離</p>
+                  <div class="flex flex-col gap-2 w-full">
+                    <button class="w-full py-3 rounded-xl text-sm font-bold" style="background:rgba(255,255,255,0.9);color:#1f2328;border:none;cursor:pointer;">自分のプロフィールを見る →</button>
+                    <button class="w-full py-2.5 rounded-xl text-sm font-medium" style="background:rgba(255,255,255,0.7);border:1.5px solid rgba(255,255,255,0.7);color:#1f2328;cursor:pointer;">ログアウト</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- メニューセクション -->
+              <div class="px-4 mt-5 space-y-4 pb-8">
+                <div>
+                  <p class="text-xs text-gray-500 font-medium mb-2 px-1" style="text-transform:uppercase;letter-spacing:.06em;">アカウント</p>
+                  <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <button class="w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-gray-100"><span class="flex-1 text-sm text-gray-800">プロフィール編集</span><span class="text-gray-300 text-lg">›</span></button>
+                    <button class="w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-gray-100"><span class="flex-1 text-sm text-gray-800">フォローリスト</span><span class="text-gray-300 text-lg">›</span></button>
+                    <button class="w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-gray-100"><span class="flex-1 text-sm text-gray-800">アカウント設定</span><span class="text-gray-300 text-lg">›</span></button>
+                    <button class="w-full flex items-center gap-3 px-4 py-3.5 text-left"><span class="flex-1 text-sm text-gray-800">プライバシー設定</span><span class="text-gray-300 text-lg">›</span></button>
+                  </div>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-500 font-medium mb-2 px-1" style="text-transform:uppercase;letter-spacing:.06em;">サポート</p>
+                  <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <button class="w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-gray-100"><span class="flex-1 text-sm text-gray-800">よくある質問（FAQ）</span><span class="text-gray-300 text-lg">›</span></button>
+                    <button class="w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-gray-100"><span class="flex-1 text-sm text-gray-800">利用規約</span><span class="text-gray-300 text-lg">›</span></button>
+                    <button class="w-full flex items-center gap-3 px-4 py-3.5 text-left"><span class="flex-1 text-sm text-gray-800">プライバシーポリシー</span><span class="text-gray-300 text-lg">›</span></button>
+                  </div>
+                </div>
+                <button class="w-full flex items-center justify-center gap-2 py-3.5 text-red-500 text-sm font-medium rounded-2xl shadow-sm" style="border:1.5px solid #fecaca;background:#fef2f2;">ログアウト</button>
+              </div>
+            </div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="home" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="search" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-[#ff6b35]"></i><span class="text-[10px] text-[#ff6b35]">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+      <!-- FOLLOWING-LIST -->
+      <div style="flex:none;width:390px;">
+        <div style="margin-bottom:10px;"><span style="font-size:13px;font-weight:600;color:#111827;">フォロー中（一覧）</span> <span style="font-size:11px;color:#9ca3af;font-family:monospace;">following-list · FollowingListScreen</span></div>
+        <div style="width:390px;height:844px;background:#fff;border-radius:14px;box-shadow:0 6px 28px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;">
+          <div style="flex:1;min-height:0;">
+            <div class="flex flex-col h-full bg-gray-50">
+              <header class="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10"><div class="flex items-center gap-3"><button><i data-lucide="arrow-left" class="w-6 h-6 text-gray-700"></i></button><h1 class="text-lg font-medium flex-1">フォロー中</h1><div class="flex items-center gap-1"><i data-lucide="users" class="w-4 h-4 text-[#ff6b35]"></i><span class="text-sm text-[#ff6b35]">4人</span></div></div></header>
+              <div class="flex-1 overflow-y-auto pb-4 scr">
+                <div class="mx-4 mt-4 bg-white rounded-2xl shadow-sm overflow-hidden">
+                  <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100"><img src="https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=150&h=150&fit=crop" class="w-12 h-12 rounded-full object-cover flex-shrink-0" /><div class="flex-1 min-w-0"><p class="text-sm font-medium text-gray-900">関西便のタカ</p><p class="text-xs text-gray-500 truncate">大型ウイング ｜ 関東〜関西</p><p class="text-xs text-gray-400 mt-0.5">投稿 128件</p></div><button class="px-3 py-1.5 border border-gray-300 text-gray-500 text-xs rounded-full flex-shrink-0">フォロー中</button></div>
+                  <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100"><img src="https://images.unsplash.com/photo-1630572780070-fce8b9e1e7e7?w=150&h=150&fit=crop" class="w-12 h-12 rounded-full object-cover flex-shrink-0" /><div class="flex-1 min-w-0"><p class="text-sm font-medium text-gray-900">地場めしユウ</p><p class="text-xs text-gray-500 truncate">4t冷凍車 ｜ 関東地場</p><p class="text-xs text-gray-400 mt-0.5">投稿 64件</p></div><button class="px-3 py-1.5 border border-gray-300 text-gray-500 text-xs rounded-full flex-shrink-0">フォロー中</button></div>
+                  <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100"><img src="https://images.unsplash.com/photo-1624395213043-fa2e123b2656?w=150&h=150&fit=crop" class="w-12 h-12 rounded-full object-cover flex-shrink-0" /><div class="flex-1 min-w-0"><p class="text-sm font-medium text-gray-900">夜景トレーラー</p><p class="text-xs text-gray-500 truncate">トレーラー ｜ 港・湾岸エリア</p><p class="text-xs text-gray-400 mt-0.5">投稿 97件</p></div><button class="px-3 py-1.5 border border-gray-300 text-gray-500 text-xs rounded-full flex-shrink-0">フォロー中</button></div>
+                  <div class="flex items-center gap-3 px-4 py-3"><img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop" class="w-12 h-12 rounded-full object-cover flex-shrink-0" /><div class="flex-1 min-w-0"><p class="text-sm font-medium text-gray-900">北海道長距離ケン</p><p class="text-xs text-gray-500 truncate">大型冷凍車 ｜ 北海道〜関東</p><p class="text-xs text-gray-400 mt-0.5">投稿 43件</p></div><button class="px-3 py-1.5 border border-gray-300 text-gray-500 text-xs rounded-full flex-shrink-0">フォロー中</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <nav class="bg-white border-t border-gray-200 flex items-center px-2 py-1">
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="home" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">ホーム</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><span class="text-gray-500"><i data-lucide="search" class="w-5 h-5"></i></span><span class="text-[10px] text-gray-500">検索</span></button>
+            <div class="flex-1 flex justify-center"><button class="w-12 h-12 bg-[#ff6b35] rounded-full flex items-center justify-center shadow-md -mt-4"><i data-lucide="plus" class="w-6 h-6 text-white"></i></button></div>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="heart" class="w-5 h-5 text-gray-500"></i><span class="text-[10px] text-gray-500">お気に入り</span></button>
+            <button class="flex-1 flex flex-col items-center py-2 gap-0.5"><i data-lucide="user" class="w-5 h-5 text-[#ff6b35]"></i><span class="text-[10px] text-[#ff6b35]">マイページ</span></button>
+          </nav>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <template id="__bundler_thumbnail">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" rx="16" fill="#ff6b35"/><text x="50" y="62" font-size="44" text-anchor="middle">🚛</text></svg>
+  </template>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  componentDidMount() {
+    const run = () => { if (window.lucide) window.lucide.createIcons(); };
+    run();
+    setTimeout(run, 300);
+    setTimeout(run, 1200);
+    // 地図描画は helmet（=head）内の ZMALoader スクリプトに移管（サンプル準拠）
+  }
+
+  // ※未使用（helmet内のheadスクリプトに移管済み）
+  _legacyInitMap() {
+    // ===== ZENRIN Maps API（検証環境）リファラ認証 =====
+    // ローダー（zma_loader.js）は helmet（=head）内で静的に読み込み済み。
+    // ここではサンプル通り ZMALoader.setOnLoad を登録するだけ。
+    const CENTER = { lat: 35.4344, lng: 139.3899 }; // 海老名SA付近
+
+    const latEl = () => document.getElementById('map-lat');
+    const lngEl = () => document.getElementById('map-lng');
+    const setCoords = (lat, lng) => {
+      if (latEl()) latEl().textContent = (+lat).toFixed(4);
+      if (lngEl()) lngEl().textContent = (+lng).toFixed(4);
+    };
+
+    const showFallback = (note) => {
+      const el = document.getElementById('dorameshi-zmap');
+      if (!el || el.querySelector('.zmap-fallback')) return;
+      el.innerHTML =
+        '<div class="zmap-fallback" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;' +
+        'background:repeating-linear-gradient(45deg,#eef1f4,#eef1f4 12px,#e7ebef 12px,#e7ebef 24px);">' +
+          '<div style="width:46px;height:46px;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;margin-bottom:12px;">' +
+            '<i data-lucide="map" style="width:24px;height:24px;color:#ff6b35;"></i></div>' +
+          '<p style="font-size:13px;font-weight:700;color:#374151;margin:0 0 4px;">ZENRIN Maps API（検証環境）</p>' +
+          '<p style="font-size:11px;color:#6b7280;line-height:1.6;margin:0;max-width:240px;">' + note + '</p>' +
+        '</div>' +
+        '<div style="position:absolute;top:12px;right:12px;display:flex;flex-direction:column;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.2);">' +
+          '<div style="width:34px;height:34px;background:#fff;display:flex;align-items:center;justify-content:center;border-bottom:1px solid #e5e7eb;font-size:20px;color:#374151;">＋</div>' +
+          '<div style="width:34px;height:34px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;color:#374151;">－</div>' +
+        '</div>';
+      if (window.lucide) window.lucide.createIcons();
+      setCoords(CENTER.lat, CENTER.lng);
+    };
+
+    // === ZENRIN サンプル準拠：ZMALoader.setOnLoad で地図生成 ===
+    const buildMap = () => {
+      if (!window.ZMALoader) { showFallback('ローダーの読み込みに失敗しました。test-js.zmaps-api.com への通信許可をご確認ください。'); return; }
+      ZMALoader.setOnLoad(function (mapOptions, error) {
+        if (error) {
+          console.error('ZENRIN setOnLoad error:', error, JSON.stringify(error));
+          showFallback('認証エラー：APIキー・リファラ設定（このドメインの登録）をご確認ください。');
+          return;
+        }
+        const el = document.getElementById('dorameshi-zmap');
+        if (!el || !window.ZDC) { showFallback('地図の初期化に失敗しました。'); return; }
+
+        // 中心点の緯度経度を設定
+        mapOptions.center = new ZDC.LatLng(CENTER.lat, CENTER.lng);
+
+        // 地図を生成
+        var map = new ZDC.Map(
+          el,
+          mapOptions,
+          function () {
+            // Success callback：拡大縮小ボタン＋中心座標の追従表示
+            try { map.addControl(new ZDC.ZoomButton('top-right')); } catch (e) {}
+            var update = function () { var c = map.getCenter(); if (c) setCoords(c.lat, c.lng); };
+            try { map.addEventListener('idle', update); } catch (e) {}
+            try { map.addEventListener('moveend', update); } catch (e) {}
+            update();
+          },
+          function () {
+            // Failure callback
+            showFallback('地図の生成に失敗しました。マップタイプの契約をご確認ください。');
+          }
+        );
+      });
+    };
+
+    // ローダーは head 内に静的読込済み。ZMALoader と地図divが揃ったら setOnLoad を登録
+    const start = (attempt) => {
+      const el = document.getElementById('dorameshi-zmap');
+      if (!el || !window.ZMALoader) {
+        if (attempt < 60) { setTimeout(() => start(attempt + 1), 150); return; }
+        showFallback('ローダーの初期化に失敗しました。test-js.zmaps-api.com への通信許可をご確認ください。');
+        return;
+      }
+      if (el._zmapInit) return;
+      el._zmapInit = true;
+      buildMap();
+      setTimeout(() => { if (!window.ZDC && !document.querySelector('.zmap-fallback')) showFallback('地図の読み込みに時間がかかっています。リファラ設定をご確認ください。'); }, 8000);
+    };
+    start(0);
+  }
+}
+</script>
+</body>
+</html>

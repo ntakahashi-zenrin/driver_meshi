@@ -1,0 +1,181 @@
+{
+  "projectId": "driver-meshi",
+  "projectName": "トラックドライバー飯",
+  "databases": [
+    {
+      "$id": "main",
+      "name": "main",
+      "enabled": true
+    }
+  ],
+  "collections": [
+    {
+      "$id": "drivers",
+      "databaseId": "main",
+      "name": "drivers",
+      "enabled": true,
+      "documentSecurity": true,
+      "permissions": ["read(\"any\")", "create(\"users\")"],
+      "attributes": [
+        { "key": "user_id",    "type": "string",  "required": true,  "array": false, "size": 255,  "default": null },
+        { "key": "nickname",   "type": "string",  "required": true,  "array": false, "size": 100,  "default": null },
+        { "key": "avatar_id",  "type": "string",  "required": false, "array": false, "size": 255,  "default": "" },
+        { "key": "cover_id",   "type": "string",  "required": false, "array": false, "size": 255,  "default": "" },
+        { "key": "body_type",  "type": "string",  "required": false, "array": false, "size": 100,  "default": "" },
+        { "key": "run_style",  "type": "string",  "required": false, "array": false, "size": 100,  "default": "" },
+        { "key": "area",       "type": "string",  "required": false, "array": false, "size": 100,  "default": "" },
+        { "key": "years",      "type": "integer", "required": false, "array": false, "min": 0, "max": 100, "default": null },
+        { "key": "bio",        "type": "string",  "required": false, "array": false, "size": 500,  "default": "" },
+        { "key": "fav_genres", "type": "string",  "required": false, "array": true,  "size": 100,  "default": null },
+        { "key": "fav_places", "type": "string",  "required": false, "array": true,  "size": 100,  "default": null },
+        { "key": "priorities", "type": "string",  "required": false, "array": true,  "size": 100,  "default": null },
+        { "key": "badges",     "type": "string",  "required": false, "array": true,  "size": 100,  "default": null }
+      ],
+      "indexes": [
+        { "key": "idx_user_id",  "type": "key",      "attributes": ["user_id"],  "orders": ["ASC"] },
+        { "key": "ft_nickname",  "type": "fulltext",  "attributes": ["nickname"], "orders": [] }
+      ]
+    },
+    {
+      "$id": "meal_posts",
+      "databaseId": "main",
+      "name": "meal_posts",
+      "enabled": true,
+      "documentSecurity": true,
+      "permissions": ["read(\"any\")", "create(\"users\")"],
+      "attributes": [
+        { "key": "driver_id",   "type": "string",  "required": true,  "array": false, "size": 255,   "default": null },
+        { "key": "image_id",    "type": "string",  "required": false, "array": false, "size": 255,   "default": "" },
+        { "key": "image_id_2",  "type": "string",  "required": false, "array": false, "size": 255,   "default": "" },
+        { "key": "image_id_3",  "type": "string",  "required": false, "array": false, "size": 255,   "default": "" },
+        { "key": "dish",        "type": "string",  "required": true,  "array": false, "size": 255,   "default": null },
+        { "key": "shop",        "type": "string",  "required": false, "array": false, "size": 255,   "default": "" },
+        { "key": "price",       "type": "integer", "required": false, "array": false, "min": 0, "max": 100000, "default": null },
+        { "key": "location",    "type": "string",  "required": false, "array": false, "size": 255,   "default": "" },
+        { "key": "oogata_ok",   "type": "boolean", "required": false, "array": false, "default": false },
+        { "key": "amenities",   "type": "string",  "required": false, "array": true,  "size": 100,   "default": null },
+        { "key": "genres",      "type": "string",  "required": false, "array": true,  "size": 100,   "default": null },
+        { "key": "comment",     "type": "string",  "required": false, "array": false, "size": 1000,  "default": "" },
+        { "key": "created_at",  "type": "string",  "required": true,  "array": false, "size": 30,    "default": null }
+      ],
+      "indexes": [
+        { "key": "idx_driver_id",  "type": "key", "attributes": ["driver_id"],  "orders": ["ASC"] },
+        { "key": "idx_created_at", "type": "key", "attributes": ["created_at"], "orders": ["DESC"] }
+      ]
+    },
+    {
+      "$id": "gallery_posts",
+      "databaseId": "main",
+      "name": "gallery_posts",
+      "enabled": true,
+      "documentSecurity": true,
+      "permissions": ["read(\"any\")", "create(\"users\")"],
+      "attributes": [
+        { "key": "driver_id",  "type": "string", "required": true,  "array": false, "size": 255,  "default": null },
+        { "key": "image_id",   "type": "string", "required": false, "array": false, "size": 255,  "default": "" },
+        { "key": "caption",    "type": "string", "required": false, "array": false, "size": 1000, "default": "" },
+        { "key": "created_at", "type": "string", "required": true,  "array": false, "size": 30,   "default": null }
+      ],
+      "indexes": [
+        { "key": "idx_driver_id",  "type": "key", "attributes": ["driver_id"],  "orders": ["ASC"] },
+        { "key": "idx_created_at", "type": "key", "attributes": ["created_at"], "orders": ["DESC"] }
+      ]
+    },
+    {
+      "$id": "follows",
+      "databaseId": "main",
+      "name": "follows",
+      "enabled": true,
+      "documentSecurity": true,
+      "permissions": ["read(\"any\")", "create(\"users\")"],
+      "attributes": [
+        { "key": "follower_id", "type": "string", "required": true, "array": false, "size": 255, "default": null },
+        { "key": "followee_id", "type": "string", "required": true, "array": false, "size": 255, "default": null },
+        { "key": "created_at",  "type": "string", "required": true, "array": false, "size": 30,  "default": null }
+      ],
+      "indexes": [
+        { "key": "idx_follower_id",          "type": "key", "attributes": ["follower_id"], "orders": ["ASC"] },
+        { "key": "idx_followee_id",          "type": "key", "attributes": ["followee_id"], "orders": ["ASC"] },
+        { "key": "idx_follower_followee",    "type": "key", "attributes": ["follower_id", "followee_id"], "orders": ["ASC", "ASC"] }
+      ]
+    },
+    {
+      "$id": "likes",
+      "databaseId": "main",
+      "name": "likes",
+      "enabled": true,
+      "documentSecurity": true,
+      "permissions": ["read(\"any\")", "create(\"users\")"],
+      "attributes": [
+        { "key": "user_id",     "type": "string", "required": true, "array": false, "size": 255, "default": null },
+        { "key": "target_type", "type": "string", "required": true, "array": false, "size": 50,  "default": null },
+        { "key": "target_id",   "type": "string", "required": true, "array": false, "size": 255, "default": null },
+        { "key": "created_at",  "type": "string", "required": true, "array": false, "size": 30,  "default": null }
+      ],
+      "indexes": [
+        { "key": "idx_target_id",       "type": "key", "attributes": ["target_id"],            "orders": ["ASC"] },
+        { "key": "idx_user_target",     "type": "key", "attributes": ["user_id", "target_id"], "orders": ["ASC", "ASC"] },
+        { "key": "idx_user_type",       "type": "key", "attributes": ["user_id", "target_type"], "orders": ["ASC", "ASC"] }
+      ]
+    },
+    {
+      "$id": "comments",
+      "databaseId": "main",
+      "name": "comments",
+      "enabled": true,
+      "documentSecurity": true,
+      "permissions": ["read(\"any\")", "create(\"users\")"],
+      "attributes": [
+        { "key": "post_id",    "type": "string", "required": true, "array": false, "size": 255,  "default": null },
+        { "key": "driver_id",  "type": "string", "required": true, "array": false, "size": 255,  "default": null },
+        { "key": "text",       "type": "string", "required": true, "array": false, "size": 2000, "default": null },
+        { "key": "created_at", "type": "string", "required": true, "array": false, "size": 30,   "default": null }
+      ],
+      "indexes": [
+        { "key": "idx_post_id", "type": "key", "attributes": ["post_id"], "orders": ["ASC"] }
+      ]
+    },
+    {
+      "$id": "notifications",
+      "databaseId": "main",
+      "name": "notifications",
+      "enabled": true,
+      "documentSecurity": false,
+      "permissions": [
+        "read(\"users\")",
+        "create(\"users\")",
+        "update(\"users\")",
+        "delete(\"users\")"
+      ],
+      "attributes": [
+        { "key": "user_id",     "type": "string",  "required": true,  "array": false, "size": 255, "default": null },
+        { "key": "type",        "type": "string",  "required": true,  "array": false, "size": 50,  "default": null },
+        { "key": "actor_id",    "type": "string",  "required": false, "array": false, "size": 255, "default": "" },
+        { "key": "target_id",   "type": "string",  "required": false, "array": false, "size": 255, "default": "" },
+        { "key": "target_type", "type": "string",  "required": false, "array": false, "size": 50,  "default": "" },
+        { "key": "read",        "type": "boolean", "required": false, "array": false,              "default": false },
+        { "key": "created_at",  "type": "string",  "required": true,  "array": false, "size": 30,  "default": null }
+      ],
+      "indexes": [
+        { "key": "idx_user_id", "type": "key", "attributes": ["user_id"], "orders": ["ASC"] }
+      ]
+    }
+  ],
+  "buckets": [
+    {
+      "$id": "media",
+      "name": "media",
+      "enabled": true,
+      "maximumFileSize": 10485760,
+      "allowedFileExtensions": ["jpg", "jpeg", "png", "gif", "webp"],
+      "compression": "none",
+      "encryption": false,
+      "antivirus": false,
+      "fileSecurity": true,
+      "permissions": [
+        "read(\"any\")",
+        "create(\"users\")"
+      ]
+    }
+  ]
+}

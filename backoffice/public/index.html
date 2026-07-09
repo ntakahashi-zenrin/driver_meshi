@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>店舗マスター管理 — トラックドライバー飯</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<!-- ログイン画面 -->
+<div id="login-view" class="view">
+  <div class="login-box">
+    <h1>店舗マスター管理</h1>
+    <p class="muted">管理者ログイン　<span style="opacity:.5">build: token-auth-v3</span></p>
+    <form id="login-form">
+      <input type="password" id="login-password" placeholder="パスワード" autocomplete="current-password" required>
+      <button type="submit">ログイン</button>
+    </form>
+    <p id="login-error" class="error"></p>
+  </div>
+</div>
+
+<!-- メイン画面 -->
+<div id="main-view" class="view" hidden>
+  <header class="topbar">
+    <h1>店舗マスター管理</h1>
+    <div class="spacer"></div>
+    <button id="btn-new" class="primary">＋ 店舗を追加</button>
+    <button id="btn-logout" class="ghost">ログアウト</button>
+  </header>
+
+  <main>
+    <p id="list-info" class="muted"></p>
+    <table id="places-table">
+      <thead>
+        <tr>
+          <th>店舗名</th><th>カテゴリ</th><th>住所</th><th>緯度/経度</th><th>大型車</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="places-tbody"></tbody>
+    </table>
+  </main>
+</div>
+
+<!-- 店舗フォーム（モーダル） -->
+<div id="form-modal" class="modal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2 id="form-title">店舗を追加</h2>
+      <button class="x" data-close-form>×</button>
+    </div>
+    <form id="place-form" class="form-grid">
+      <input type="hidden" id="f-id">
+
+      <!-- 場所（地図で選ぶ） -->
+      <div class="field full">
+        <label>場所（住所・緯度経度）<span class="req">*</span></label>
+        <div class="location-box" id="location-box">
+          <div class="location-empty" id="location-empty">まだ設定されていません</div>
+          <div class="location-set" id="location-set" hidden>
+            <div class="loc-addr" id="loc-addr"></div>
+            <div class="loc-coord muted" id="loc-coord"></div>
+          </div>
+          <button type="button" id="btn-pick" class="ghost">地図で場所を選ぶ</button>
+        </div>
+        <input type="hidden" id="f-address">
+        <input type="hidden" id="f-lat">
+        <input type="hidden" id="f-lng">
+        <input type="hidden" id="f-pref_code">
+      </div>
+
+      <div class="field">
+        <label>店舗名<span class="req">*</span></label>
+        <input type="text" id="f-name" required>
+      </div>
+      <div class="field">
+        <label>カテゴリ<span class="req">*</span></label>
+        <select id="f-category" required>
+          <option value="">選択してください</option>
+          <option>道の駅</option>
+          <option>トラックステーション</option>
+          <option>SA・PA</option>
+          <option>店舗</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>電話番号</label>
+        <input type="text" id="f-phone" placeholder="例：011-897-9101">
+      </div>
+      <div class="field full">
+        <label>営業時間（自由記述）</label>
+        <input type="text" id="f-hours_text" placeholder="例：9:00〜17:00（土日祝休）">
+      </div>
+      <div class="field full">
+        <label>大型車の駐車台数目安（自由記述）</label>
+        <input type="text" id="f-truck_parking" placeholder="例：大型車なら2台程度">
+      </div>
+
+      <div class="field full">
+        <label>設備・条件</label>
+        <div class="checks">
+          <label><input type="checkbox" id="f-oogata_ok"> 大型車OK</label>
+          <label><input type="checkbox" id="f-midnight_open"> 深夜営業</label>
+          <label><input type="checkbox" id="f-early_open"> 早朝営業</label>
+          <label><input type="checkbox" id="f-open_24h"> 24時間対応</label>
+          <label><input type="checkbox" id="f-shower"> シャワー</label>
+          <label><input type="checkbox" id="f-wifi"> WiFi</label>
+        </div>
+      </div>
+
+      <div class="form-actions full">
+        <button type="submit" class="primary">保存する</button>
+        <button type="button" class="ghost" data-close-form>キャンセル</button>
+        <span id="form-error" class="error"></span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 地図ピッカー（モーダル） -->
+<div id="picker-modal" class="modal" hidden>
+  <div class="modal-card picker-card">
+    <div class="modal-head">
+      <h2>地図で場所を選ぶ</h2>
+      <button class="x" data-close-picker>×</button>
+    </div>
+    <div class="picker-search">
+      <input type="text" id="pick-address" placeholder="住所・施設名を入力して検索">
+      <button type="button" id="btn-search" class="primary">検索</button>
+    </div>
+    <div class="picker-map-wrap" id="map-wrap">
+      <img id="map-img" alt="地図" draggable="false">
+      <!-- 中央固定ピン（画像中心＝選択地点） -->
+      <div class="center-pin">🍚</div>
+      <div class="map-hint">地図をクリックして中心（お店の位置）を合わせてください</div>
+      <div class="zoom-ctrl">
+        <button type="button" id="btn-zoom-in">＋</button>
+        <button type="button" id="btn-zoom-out">−</button>
+      </div>
+    </div>
+    <div class="picker-foot">
+      <div class="picker-result">
+        <div id="pick-addr" class="loc-addr">—</div>
+        <div id="pick-coord" class="loc-coord muted">緯度 — ／ 経度 —</div>
+      </div>
+      <button type="button" id="btn-confirm-loc" class="primary">この地点で登録する</button>
+    </div>
+    <p id="picker-error" class="error"></p>
+  </div>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>トラックドライバー飯 プロトタイプ</title>
+<style>
+  :root{
+    --orange:#F4661E;
+    --orange-soft:#FDE9DD;
+    --bg:#FFFFFF;
+    --line:#ECECEC;
+    --text:#1F2328;
+    --muted:#6B7280;
+    --tag-bg:#F2F3F5;
+    --green:#16A34A;
+    --green-soft:#E7F6EC;
+    --shadow:0 2px 12px rgba(0,0,0,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif;
+    background:#E9EAEC;color:var(--text);
+    display:flex;justify-content:center;min-height:100vh;
+  }
+  /* phone shell */
+  .phone{
+    width:440px;max-width:100vw;background:var(--bg);
+    min-height:100vh;position:relative;overflow:hidden;
+    display:flex;flex-direction:column;
+  }
+  @media(min-width:480px){
+    body{align-items:flex-start;padding:24px 0;}
+    .phone{min-height:895px;height:895px;border-radius:28px;box-shadow:0 12px 40px rgba(0,0,0,.18);}
+  }
+  .screen{flex:1;overflow-y:auto;padding-bottom:90px;-webkit-overflow-scrolling:touch;}
+  .screen::-webkit-scrollbar{display:none;}
+  .hidden{display:none!important;}
+
+  /* ---------- Header ---------- */
+  .hdr{
+    position:sticky;top:0;z-index:20;background:#fff;
+    border-bottom:1px solid var(--line);
+  }
+  .hdr-row{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;}
+  .hdr-title{font-size:21px;font-weight:800;letter-spacing:.02em;}
+  .hdr-icons{display:flex;gap:12px;}
+  .icon-btn{
+    width:36px;height:36px;border-radius:50%;border:none;background:transparent;
+    display:flex;align-items:center;justify-content:center;color:var(--text);cursor:pointer;
+    position:relative;
+  }
+  .icon-btn svg{width:21px;height:21px;}
+  .dot{position:absolute;top:7px;right:8px;width:8px;height:8px;background:var(--orange);border-radius:50%;}
+  .back-row{display:flex;align-items:center;gap:12px;padding:14px 16px;}
+  .back-row .hdr-title{font-size:19px;}
+
+  /* ---------- Filter tabs ---------- */
+  .filters{display:flex;gap:8px;padding:4px 16px 12px;overflow-x:auto;}
+  .filters::-webkit-scrollbar{display:none;}
+  .chip{
+    flex:0 0 auto;border:none;background:var(--tag-bg);color:var(--muted);
+    padding:7px 16px;border-radius:18px;font-size:14px;font-weight:600;cursor:pointer;
+    transition:.15s;
+  }
+  .chip.active{background:var(--orange);color:#fff;}
+
+  /* ---------- Post card ---------- */
+  .card{border-bottom:8px solid #F4F4F5;}
+  .card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;}
+  .author{display:flex;align-items:center;gap:12px;cursor:pointer;}
+  .avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;flex:0 0 auto;background:var(--tag-bg);}
+  .author .name{font-size:15px;font-weight:700;line-height:1.3;}
+  .author .meta{font-size:12px;color:var(--muted);line-height:1.3;}
+  .follow-btn{
+    border:1.5px solid var(--orange);background:var(--orange);color:#fff;
+    padding:5px 18px;border-radius:16px;font-size:13px;font-weight:700;cursor:pointer;transition:.15s;
+    flex:0 0 auto;
+  }
+  .follow-btn.following{background:#fff;color:var(--orange);}
+  .food-img{width:100%;aspect-ratio:440/319;object-fit:cover;display:block;background:var(--tag-bg);cursor:pointer;}
+  .card-body{padding:14px 16px 16px;}
+  .dish{font-size:18px;font-weight:800;}
+  .shop{font-size:14px;color:#374151;margin-top:3px;}
+  .price-row{display:flex;align-items:center;gap:14px;margin-top:8px;font-size:14px;}
+  .price{font-weight:700;}
+  .loc{display:flex;align-items:center;gap:4px;color:var(--muted);}
+  .loc svg{width:14px;height:14px;}
+  .ok-badge{
+    display:inline-flex;align-items:center;gap:5px;background:var(--green-soft);color:var(--green);
+    padding:4px 10px;border-radius:6px;font-size:12px;font-weight:700;margin-top:12px;
+  }
+  .ok-badge svg{width:12px;height:12px;}
+  .tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .tag{background:var(--tag-bg);color:#4B5563;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;}
+  .react{display:flex;gap:18px;margin-top:14px;}
+  .react button{display:flex;align-items:center;gap:6px;border:none;background:none;color:var(--muted);font-size:14px;cursor:pointer;}
+  .react svg{width:20px;height:20px;}
+  .react .liked{color:var(--orange);}
+
+  /* feed item label (follow timeline) */
+  .feed-label{display:flex;align-items:center;gap:8px;padding:12px 16px 0;}
+  .feed-label .pill{background:var(--tag-bg);color:#4B5563;padding:3px 12px;border-radius:6px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:5px;}
+  .feed-label .pill svg{width:12px;height:12px;}
+  .feed-label .time{font-size:12px;color:var(--muted);}
+
+  /* gallery / badge blocks */
+  .gallery-img{width:100%;aspect-ratio:408/221;object-fit:cover;display:block;background:var(--tag-bg);margin-top:12px;}
+  .gallery-cap{padding:10px 16px 0;font-size:14px;color:#374151;}
+  .badge-block{display:flex;align-items:center;gap:14px;padding:16px;margin:12px 16px;background:var(--orange-soft);border-radius:12px;}
+  .badge-ic{width:48px;height:48px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;color:#fff;flex:0 0 auto;}
+  .badge-ic svg{width:24px;height:24px;}
+  .badge-block .small{font-size:12px;color:var(--muted);}
+  .badge-block .big{font-size:16px;font-weight:800;margin-top:2px;}
+
+  /* ---------- Profile ---------- */
+  .cover{width:100%;height:172px;object-fit:cover;background:var(--tag-bg);display:block;}
+  .prof-top{padding:0 16px;position:relative;}
+  .prof-avatar{width:96px;height:96px;border-radius:50%;border:4px solid #fff;object-fit:cover;margin-top:-48px;background:var(--tag-bg);}
+  .prof-followbtn{
+    position:absolute;right:16px;top:18px;border:none;background:var(--orange);color:#fff;
+    padding:11px 26px;border-radius:24px;font-size:15px;font-weight:700;cursor:pointer;transition:.15s;
+  }
+  .prof-followbtn.following{background:#fff;color:var(--orange);border:1.5px solid var(--orange);}
+  .prof-name{font-size:24px;font-weight:800;margin-top:12px;}
+  .prof-stats{display:flex;gap:18px;margin-top:10px;font-size:14px;}
+  .prof-stats b{font-weight:800;}
+  .prof-role{font-size:14px;color:#374151;margin-top:12px;}
+  .prof-bio{font-size:14px;color:#374151;margin-top:6px;}
+  .prof-tags{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 18px;}
+  .prof-tags .tag{background:var(--orange-soft);color:var(--orange);}
+  .ptabs{display:flex;border-top:1px solid var(--line);border-bottom:1px solid var(--line);position:sticky;top:53px;background:#fff;z-index:10;}
+  .ptab{flex:1;padding:14px 0;text-align:center;font-size:15px;font-weight:700;color:var(--muted);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;}
+  .ptab.active{color:var(--orange);border-bottom-color:var(--orange);}
+  .info-card{margin:16px;padding:16px;border:1px solid var(--line);border-radius:12px;}
+  .info-card h3{font-size:15px;font-weight:800;margin-bottom:10px;}
+  .info-card p{font-size:14px;color:#374151;line-height:1.9;}
+  .badge-grid{display:flex;flex-wrap:wrap;gap:10px;}
+  .badge-chip{display:inline-flex;align-items:center;gap:6px;background:var(--orange-soft);color:var(--orange);padding:6px 12px;border-radius:8px;font-size:13px;font-weight:700;}
+  .badge-chip svg{width:12px;height:12px;}
+  .act-head{padding:18px 16px 4px;font-size:15px;font-weight:800;}
+
+  /* ---------- Post compose screen ---------- */
+  .compose{padding:16px;}
+  .photo-drop{
+    width:100%;aspect-ratio:4/3;background:var(--tag-bg);border-radius:14px;border:2px dashed #CBD5E1;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);cursor:pointer;
+  }
+  .photo-drop svg{width:46px;height:46px;}
+  .field{margin-top:18px;}
+  .field label{display:block;font-size:13px;font-weight:700;color:#374151;margin-bottom:6px;}
+  .field input,.field textarea{
+    width:100%;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:15px;font-family:inherit;background:#fff;
+  }
+  .field textarea{resize:none;height:84px;}
+  .select-tags{display:flex;flex-wrap:wrap;gap:8px;}
+  .select-tags .opt{border:1px solid var(--line);background:#fff;color:#4B5563;padding:8px 14px;border-radius:18px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;}
+  .select-tags .opt.on{background:var(--orange);color:#fff;border-color:var(--orange);}
+  .submit{
+    width:100%;margin-top:24px;border:none;background:var(--orange);color:#fff;
+    padding:15px;border-radius:12px;font-size:16px;font-weight:800;cursor:pointer;
+  }
+  .compose-note{text-align:center;color:var(--muted);font-size:13px;margin-top:12px;}
+
+  /* ---------- Bottom nav ---------- */
+  .nav{
+    position:absolute;bottom:0;left:0;right:0;height:85px;background:#fff;
+    border-top:1px solid var(--line);display:flex;align-items:flex-start;justify-content:space-around;
+    padding:13px 24px 0;z-index:30;
+  }
+  .nav-btn{display:flex;flex-direction:column;align-items:center;gap:5px;border:none;background:none;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;flex:1;}
+  .nav-btn svg{width:24px;height:24px;}
+  .nav-btn.active{color:var(--orange);}
+  .nav-post{margin-top:-16px;}
+  .nav-post .circle{width:56px;height:56px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:var(--shadow);}
+  .nav-post .circle svg{width:28px;height:28px;}
+
+  /* toast */
+  .toast{
+    position:absolute;bottom:100px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:#1F2328;color:#fff;padding:11px 20px;border-radius:24px;font-size:14px;font-weight:600;
+    opacity:0;pointer-events:none;transition:.25s;z-index:50;white-space:nowrap;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- ============ SCREEN: TIMELINE ============ -->
+  <div class="screen" id="screen-home">
+    <div class="hdr">
+      <div class="hdr-row">
+        <div class="hdr-title">トラックドライバー飯</div>
+        <div class="hdr-icons">
+          <button class="icon-btn" onclick="toast('検索（プロトタイプでは未実装）')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
+          <button class="icon-btn" onclick="toast('お知らせ（プロトタイプでは未実装）')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="dot"></span></button>
+        </div>
+      </div>
+      <div class="filters" id="home-filters">
+        <button class="chip active">おすすめ</button>
+        <button class="chip">フォロー中</button>
+        <button class="chip">SA・PA</button>
+        <button class="chip">デカ盛り</button>
+        <button class="chip">大型車OK</button>
+      </div>
+    </div>
+    <div id="home-feed"></div>
+  </div>
+
+  <!-- ============ SCREEN: FOLLOWING ============ -->
+  <div class="screen hidden" id="screen-following">
+    <div class="hdr">
+      <div class="hdr-row">
+        <div class="hdr-title">フォロー中</div>
+        <div class="hdr-icons">
+          <button class="icon-btn" onclick="toast('検索（プロトタイプでは未実装）')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
+          <button class="icon-btn" onclick="toast('お知らせ（プロトタイプでは未実装）')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></button>
+        </div>
+      </div>
+    </div>
+    <div id="following-feed"></div>
+  </div>
+
+  <!-- ============ SCREEN: PROFILE ============ -->
+  <div class="screen hidden" id="screen-profile">
+    <div class="hdr">
+      <div class="back-row">
+        <button class="icon-btn" style="width:24px;height:24px" onclick="go('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></button>
+        <div class="hdr-title">プロフィール</div>
+      </div>
+    </div>
+    <div id="profile-body"></div>
+  </div>
+
+  <!-- ============ SCREEN: COMPOSE ============ -->
+  <div class="screen hidden" id="screen-post">
+    <div class="hdr">
+      <div class="back-row">
+        <button class="icon-btn" style="width:24px;height:24px" onclick="go('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        <div class="hdr-title">飯を投稿</div>
+      </div>
+    </div>
+    <div class="compose">
+      <div class="photo-drop" onclick="toast('写真を選択（プロトタイプでは未実装）')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        <span>飯の写真を追加</span>
+      </div>
+      <div class="field"><label>メニュー名</label><input placeholder="例：デカ盛り唐揚げ定食"></div>
+      <div class="field"><label>店名・場所</label><input placeholder="例：海老名SA 下り"></div>
+      <div class="field"><label>金額</label><input placeholder="例：1,280円" inputmode="numeric"></div>
+      <div class="field">
+        <label>この店のポイント（タップで選択）</label>
+        <div class="select-tags" id="post-amenities">
+          <button class="opt">大型車OK</button>
+          <button class="opt">駐車場広め</button>
+          <button class="opt">深夜営業</button>
+          <button class="opt">早朝OK</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>飯ジャンル（タップで選択）</label>
+        <div class="select-tags" id="post-genres">
+          <button class="opt">デカ盛り</button>
+          <button class="opt">ラーメン</button>
+          <button class="opt">定食</button>
+          <button class="opt">朝定食</button>
+          <button class="opt">カレー</button>
+          <button class="opt">深夜飯</button>
+        </div>
+      </div>
+      <div class="field"><label>ひとこと</label><textarea placeholder="大型駐車場あり、深夜でも助かる一杯。"></textarea></div>
+      <button class="submit" onclick="go('home');toast('投稿しました（プロトタイプ）')">投稿する</button>
+      <p class="compose-note">入力は選択式中心。誰でもそれらしい投稿が作れる想定です。</p>
+    </div>
+  </div>
+
+  <!-- ============ Bottom nav ============ -->
+  <div class="nav" id="nav">
+    <button class="nav-btn active" data-screen="home" onclick="go('home')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>ホーム</button>
+    <button class="nav-btn" onclick="toast('検索（プロトタイプでは未実装）')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>検索</button>
+    <button class="nav-btn nav-post" onclick="go('post')">
+      <span class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></span></button>
+    <button class="nav-btn" data-screen="following" onclick="go('following')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>フォロー</button>
+    <button class="nav-btn" data-screen="profile" onclick="openProfile('taka')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>マイページ</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* ---------- data ---------- */
+const drivers = {
+  taka:{name:"関西便のタカ",meta:"大型ウイング | 関東〜関西",avatar:"https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=160&h=160&fit=crop",
+        cover:"https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=440&h=192&fit=crop",
+        role:"大型ウイング｜関東〜関西｜ドライバー歴12年",
+        bio:"大型車OKの食堂と深夜ラーメンを中心に投稿しています。",
+        stats:{posts:128,followers:540,likes:"3,210"},
+        ptags:["大型ウイング","長距離","関東〜関西","デカ盛り","深夜飯"],
+        info:["車種：大型ウイング","運行スタイル：長距離","走行エリア：関東〜関西","ドライバー歴：12年"],
+        taste:["好きな飯：デカ盛り、ラーメン、定食","よく投稿する場所：SA・PA、幹線道路沿い","重視するポイント：大型車OK、深夜営業"],
+        badges:["デカ盛りハンター","SA・PAマスター","大型車OK発掘隊","深夜飯職人"]},
+  yu:{name:"地場めしユウ",meta:"4t冷凍車 | 関東地場",avatar:"https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=160&h=160&fit=crop"},
+  yakei:{name:"夜景トレーラー",meta:"トレーラー | 港・湾岸エリア",avatar:"https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=160&h=160&fit=crop"}
+};
+const posts = [
+  {id:1,who:"taka",img:"https://images.unsplash.com/photo-1582281298055-e25b84a30b0b?w=440&h=319&fit=crop",
+   dish:"デカ盛り唐揚げ定食",shop:"海老名SA 下り",price:"1,280円",loc:"神奈川県海老名市",
+   tags:["長距離","デカ盛り","深夜飯"],likes:124,comments:18},
+  {id:2,who:"yu",img:"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=440&h=319&fit=crop",
+   dish:"朝定食セット",shop:"食堂まつり",price:"780円",loc:"埼玉県川口市",
+   tags:["朝定食","地元飯","駐車場広め"],likes:89,comments:12},
+  {id:3,who:"yakei",img:"https://images.unsplash.com/photo-1557872943-16a5ac26437e?w=440&h=319&fit=crop",
+   dish:"特製味噌ラーメン",shop:"湾岸ラーメン 夜王",price:"950円",loc:"東京都江東区",
+   tags:["夜景","湾岸線","深夜飯"],likes:156,comments:24}
+];
+/* who is followed */
+const followState = {taka:false,yu:false,yakei:false};
+const likeState = {};
+
+/* icons */
+const icPin = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>';
+const icCheck = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>';
+const icHeart = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.5-1.5 3-3.3 3-5.5A4.5 4.5 0 0 0 12 5 4.5 4.5 0 0 0 2 8.5c0 2.2 1.5 4 3 5.5l7 7z"/></svg>';
+const icComment = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.5 8.5 0 0 1-12 7.7L3 21l1.8-6A8.5 8.5 0 1 1 21 11.5"/></svg>';
+const icImg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>';
+const icBadge = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M8.2 13.5 7 22l5-3 5 3-1.2-8.5"/></svg>';
+
+/* ---------- render a post card ---------- */
+function postCard(p){
+  const d = drivers[p.who];
+  const following = followState[p.who];
+  const liked = likeState[p.id];
+  const likes = p.likes + (liked?1:0);
+  return `<article class="card">
+    <div class="card-head">
+      <div class="author" onclick="openProfile('${p.who}')">
+        <img class="avatar" src="${d.avatar}" alt="">
+        <div><div class="name">${d.name}</div><div class="meta">${d.meta}</div></div>
+      </div>
+      <button class="follow-btn ${following?'following':''}" onclick="event.stopPropagation();toggleFollow('${p.who}',this)">${following?'フォロー中':'フォロー'}</button>
+    </div>
+    <img class="food-img" src="${p.img}" alt="" onclick="openProfile('${p.who}')">
+    <div class="card-body">
+      <div class="dish">${p.dish}</div>
+      <div class="shop">${p.shop}</div>
+      <div class="price-row"><span class="price">${p.price}</span><span class="loc">${icPin}${p.loc}</span></div>
+      <span class="ok-badge">${icCheck}大型車OK</span>
+      <div class="tags">${p.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+      <div class="react">
+        <button onclick="toggleLike(${p.id},this)"><span class="${liked?'liked':''}">${icHeart}</span><span>${likes}</span></button>
+        <button onclick="toast('コメント（プロトタイプでは未実装）')">${icComment}<span>${p.comments}</span></button>
+      </div>
+    </div>
+  </article>`;
+}
+
+/* ---------- home feed ---------- */
+function renderHome(){
+  document.getElementById('home-feed').innerHTML = posts.map(postCard).join('');
+}
+
+/* ---------- following feed (mixed activity) ---------- */
+function renderFollowing(){
+  const anyFollow = Object.values(followState).some(v=>v);
+  let html = '';
+  if(!anyFollow){
+    html = `<div style="padding:60px 32px;text-align:center;color:var(--muted)">
+      <div style="font-size:46px;margin-bottom:14px">🚚</div>
+      <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">まだ誰もフォローしていません</div>
+      <div style="font-size:14px;line-height:1.7">ホームの飯投稿から気になるドライバーをフォローすると、<br>飯投稿に加えてギャラリー更新やバッジ獲得もここに流れます。</div>
+    </div>`;
+    document.getElementById('following-feed').innerHTML = html;
+    return;
+  }
+  // build a mixed activity feed for followed drivers
+  const items = [];
+  if(followState.taka){
+    items.push({type:'post',who:'taka',time:'2時間前',post:posts[0]});
+    items.push({type:'gallery',who:'taka',time:'12時間前',img:'https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=408&h=221&fit=crop',cap:'朝焼けの荷下ろし前。今日も一日よろしくお願いします。',likes:145,comments:16});
+  }
+  if(followState.yakei){
+    items.push({type:'gallery',who:'yakei',time:'4時間前',img:'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=408&h=221&fit=crop',cap:'深夜2時の湾岸線。今日も安全運転で行きます。',likes:89,comments:12});
+  }
+  if(followState.yu){
+    items.push({type:'badge',who:'yu',time:'6時間前',badge:'朝飯マスター'});
+    items.push({type:'post',who:'yu',time:'8時間前',post:posts[1]});
+  }
+  html = items.map(it=>{
+    const d = drivers[it.who];
+    const head = (label)=>`<div class="feed-label"><span class="pill">${label}</span><span class="time">${it.time}</span></div>
+      <div class="card-head"><div class="author" onclick="openProfile('${it.who}')"><img class="avatar" src="${d.avatar}"><div><div class="name">${d.name}</div><div class="meta">${d.meta}</div></div></div></div>`;
+    if(it.type==='post'){
+      // reuse postCard body but with activity label
+      return `<article class="card">${head('飯投稿')}
+        <img class="food-img" src="${it.post.img}" onclick="openProfile('${it.who}')">
+        <div class="card-body">
+          <div class="dish">${it.post.dish}</div><div class="shop">${it.post.shop}</div>
+          <div class="price-row"><span class="price">${it.post.price}</span><span class="loc">${icPin}${it.post.loc}</span></div>
+          <span class="ok-badge">${icCheck}大型車OK</span>
+          <div class="tags">${it.post.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+        </div></article>`;
+    }
+    if(it.type==='gallery'){
+      return `<article class="card">${head('<span>'+icImg+'</span>ギャラリー更新')}
+        <img class="gallery-img" src="${it.img}">
+        <div class="gallery-cap">${it.cap}</div>
+        <div class="card-body" style="padding-top:10px"><div class="react">
+          <button>${icHeart}<span>${it.likes}</span></button>
+          <button>${icComment}<span>${it.comments}</span></button>
+        </div></div></article>`;
+    }
+    if(it.type==='badge'){
+      return `<article class="card">${head('<span>'+icBadge+'</span>バッジ獲得')}
+        <div class="badge-block"><span class="badge-ic">${icBadge}</span>
+          <div><div class="small">バッジを獲得しました</div><div class="big">${it.badge}</div></div></div>
+      </article>`;
+    }
+  }).join('');
+  document.getElementById('following-feed').innerHTML = html;
+}
+
+/* ---------- profile ---------- */
+let activePtab = 0;
+function openProfile(who){
+  const d = drivers[who];
+  if(!d.role){ // minor driver without full profile -> use taka template style minimal
+    document.getElementById('profile-body').innerHTML =
+      `<div style="padding:60px 32px;text-align:center;color:var(--muted)">
+       <img class="avatar" style="width:80px;height:80px;margin-bottom:12px" src="${d.avatar}">
+       <div style="font-size:18px;font-weight:800;color:var(--text)">${d.name}</div>
+       <div style="margin-top:4px">${d.meta}</div>
+       <div style="margin-top:16px;font-size:14px">このドライバーの詳細プロフィールはプロトタイプ未作成です。</div></div>`;
+    showOnly('screen-profile'); setNav('profile'); return;
+  }
+  const following = followState[who];
+  activePtab = 0;
+  document.getElementById('profile-body').innerHTML = `
+    <img class="cover" src="${d.cover}">
+    <div class="prof-top">
+      <img class="prof-avatar" src="${d.avatar}">
+      <button class="prof-followbtn ${following?'following':''}" onclick="toggleFollow('${who}',this,true)">${following?'フォロー中':'フォローする'}</button>
+      <div class="prof-name">${d.name}</div>
+      <div class="prof-stats"><span>投稿 <b>${d.stats.posts}</b></span><span>フォロワー <b>${d.stats.followers}</b></span><span>いいね <b>${d.stats.likes}</b></span></div>
+      <div class="prof-role">${d.role}</div>
+      <div class="prof-bio">${d.bio}</div>
+      <div class="prof-tags">${d.ptags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+    </div>
+    <div class="ptabs">
+      <button class="ptab active" onclick="setPtab(0,'${who}')">プロフィール</button>
+      <button class="ptab" onclick="setPtab(1,'${who}')">飯投稿</button>
+      <button class="ptab" onclick="setPtab(2,'${who}')">ギャラリー</button>
+    </div>
+    <div id="ptab-content"></div>`;
+  renderPtab(who);
+  showOnly('screen-profile'); setNav('profile');
+  document.getElementById('screen-profile').scrollTop = 0;
+}
+function setPtab(i,who){
+  activePtab=i;
+  document.querySelectorAll('.ptab').forEach((b,idx)=>b.classList.toggle('active',idx===i));
+  renderPtab(who);
+}
+function renderPtab(who){
+  const d=drivers[who]; const el=document.getElementById('ptab-content');
+  if(activePtab===0){
+    el.innerHTML=`
+      <div class="info-card"><h3>ドライバー情報</h3><p>${d.info.join('<br>')}</p></div>
+      <div class="info-card"><h3>飯の好み</h3><p>${d.taste.join('<br>')}</p></div>
+      <div class="info-card"><h3>実績・バッジ</h3><div class="badge-grid">${d.badges.map(b=>`<span class="badge-chip">${icBadge}${b}</span>`).join('')}</div></div>`;
+  } else if(activePtab===1){
+    const mine = posts.filter(p=>p.who===who);
+    el.innerHTML = mine.length? mine.map(postCard).join('') : emptyState('まだ飯投稿がありません');
+  } else {
+    el.innerHTML = `<img class="gallery-img" style="margin:16px 16px 0;width:calc(100% - 32px);border-radius:12px" src="https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=408&h=221&fit=crop">
+      <div class="gallery-cap">深夜2時の湾岸線。今日も安全運転で行きます。</div>
+      <img class="gallery-img" style="margin:20px 16px 0;width:calc(100% - 32px);border-radius:12px" src="https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=408&h=221&fit=crop">
+      <div class="gallery-cap" style="padding-bottom:20px">朝焼けの荷下ろし前。今日も一日よろしくお願いします。</div>`;
+  }
+}
+function emptyState(t){return `<div style="padding:50px;text-align:center;color:var(--muted)">${t}</div>`;}
+
+/* ---------- interactions ---------- */
+function toggleFollow(who,btn,isProfile){
+  followState[who]=!followState[who];
+  const on=followState[who];
+  if(isProfile){btn.textContent=on?'フォロー中':'フォローする';}
+  else{btn.textContent=on?'フォロー中':'フォロー';}
+  btn.classList.toggle('following',on);
+  toast(on?`${drivers[who].name} をフォローしました`:'フォローを解除しました');
+  // keep home cards in sync
+  renderHome();
+}
+function toggleLike(id,btn){
+  likeState[id]=!likeState[id];
+  renderHome();
+}
+
+/* ---------- navigation ---------- */
+function showOnly(id){
+  ['screen-home','screen-following','screen-profile','screen-post'].forEach(s=>{
+    document.getElementById(s).classList.toggle('hidden',s!==id);
+  });
+}
+function setNav(active){
+  document.querySelectorAll('.nav-btn').forEach(b=>{
+    b.classList.toggle('active',b.dataset.screen===active);
+  });
+}
+function go(where){
+  if(where==='home'){renderHome();showOnly('screen-home');setNav('home');document.getElementById('screen-home').scrollTop=0;}
+  if(where==='following'){renderFollowing();showOnly('screen-following');setNav('following');document.getElementById('screen-following').scrollTop=0;}
+  if(where==='post'){showOnly('screen-post');setNav('');document.getElementById('screen-post').scrollTop=0;}
+}
+
+/* compose tag toggles */
+document.querySelectorAll('#post-amenities .opt, #post-genres .opt').forEach(o=>{
+  o.onclick=()=>o.classList.toggle('on');
+});
+
+/* toast */
+let toastTimer;
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),1900);
+}
+
+/* init */
+renderHome();
+</script>
+</body>
+</html>

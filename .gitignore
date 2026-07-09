@@ -1,0 +1,25 @@
+# --- 秘密情報（絶対にコミットしない） ---
+.env
+*.env
+.env.local
+*.env.local
+**/.env.local
+appwrite/.env
+appwrite/
+
+# --- 依存パッケージ・ビルド成果物 ---
+node_modules/
+dist/
+build/
+.vite/
+
+# --- OS / エディタ ---
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+
+# --- 一時ファイル ---
+tmp/
+*.tmp
